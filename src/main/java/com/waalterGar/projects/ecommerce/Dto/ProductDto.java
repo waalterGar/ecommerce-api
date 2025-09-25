@@ -4,6 +4,7 @@ import com.waalterGar.projects.ecommerce.utils.Currency;
 import com.waalterGar.projects.ecommerce.utils.PriceFormatter;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
@@ -12,6 +13,7 @@ import java.math.BigDecimal;
 @EqualsAndHashCode
 @Getter
 @Setter
+@NoArgsConstructor
 public class ProductDto {
     private String sku;
     private String name;
@@ -30,5 +32,6 @@ public class ProductDto {
         this.stockQuantity = stockQuantity;
         this.isActive = isActive;
     }
+
 
 }

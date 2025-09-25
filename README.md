@@ -30,7 +30,7 @@ MYSQL_ROOT_PASSWORD=rootpass
 
 ### 2. Levantar la base de datos con Docker
 En la raíz del proyecto:
-````
+````bash
 docker-compose up -d
 ````
 Esto levantará:
@@ -39,18 +39,18 @@ Esto levantará:
 - (Opcional) phpMyAdmin en http://localhost:8081
 
 ### 3. Ejecutar la aplicación
-````
+````bash
 ./mvnw spring-boot:run
 ````
 
 ---
 
 ## 📚 Endpoints actuales
-Product
 
-- POST `/products` → Crear un producto
-Ejemplo de body:
-````json
+### 🛍️ Products
+- **POST** `/products` → Crear un producto  
+  Ejemplo de body:
+```json
 {
   "sku": "TSHIRT-BASIC-001",
   "name": "Camiseta Básica Blanca",
@@ -59,10 +59,34 @@ Ejemplo de body:
   "currency": "EUR",
   "stockQuantity": 150
 }
-````
+```
 - **GET** `/products` → Listar todos los productos
-- **GET** `/products/sku` → Obtener un producto por ID
+- **GET** `/products/{sku}` → Obtener un producto por SKU
 
+---
+
+### 🧑‍🤝‍🧑 Customers
+
+- **POST** `/customers` → Crear un customer  
+  Ejemplo de body:
+```json
+{
+  "externalId": "aaaaaaaaaaaaaaaaaaaa",
+  "firstName": "Walter",
+  "lastName": "Garcia",
+  "email": "walter@example.com",
+  "phoneNumber": "+34 600123456",
+  "address": "Calle Falsa 123",
+  "city": "Madrid",
+  "state": "Madrid",
+  "zipCode": "28001",
+  "countryCode": "ES",
+  "isActive": true
+}
+```
+
+- **GET** `/customers` → Listar todos los customers
+- **GET** `/customers/{externalId}` → Obtener un customer por su ExternalId
 
 ---
 
@@ -70,23 +94,27 @@ Ejemplo de body:
 
 El proyecto incluye tests unitarios escritos con **JUnit 5** y **Mockito**.
 
-Actualmente se han implementado tests mínimos para la clase `ProductServiceImpl`, que cubren los siguientes casos:
-- **`createProduct`**: valida que un producto se guarde y se mapee correctamente.
-- **`getProductBySku`**: comprueba la recuperación de un producto por SKU (tanto cuando existe como cuando no existe).
-- **`getAllProducts`**: verifica que se devuelva una lista vacía cuando no hay productos.
+Actualmente se han implementado tests mínimos para:
+- **`ProductServiceImpl`**:
+    - `createProduct`: valida que un producto se guarde y se mapee correctamente.
+    - `getProductBySku`: comprueba la recuperación de un producto por SKU (cuando existe y cuando no existe).
+    - `getAllProducts`: verifica que se devuelva una lista vacía cuando no hay productos.
+- **`CustomerServiceImpl`**:
+    - `createCustomer`: valida que un customer se guarde y se mapee correctamente.
+    - `getCustomerByExternalId`: comprueba la recuperación de un customer por externalId (cuando existe y cuando no existe).
+    - `getAllCustomers`: verifica que se devuelva una lista vacía cuando no hay customers.
 
 Para ejecutar los tests, usa:
-````bash
+```bash
 ./mvnw test
-````
+```
 
 ---
 
 ## 📈 Próximos pasos
-- Añadir más endpoints (usuarios, pedidos, categorías).
+- Añadir más endpoints (pedidos, categorías).
 - Implementar seguridad con Spring Security y JWT.
 - Implementar manejo avanzado de errores y validaciones.
 - Ampliar la cobertura de tests.
-
 
 ---

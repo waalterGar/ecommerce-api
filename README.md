@@ -42,6 +42,9 @@ Esto levantará:
 ````
 ./mvnw spring-boot:run
 ````
+
+---
+
 ## 📚 Endpoints actuales
 Product
 
@@ -59,3 +62,31 @@ Ejemplo de body:
 ````
 - **GET** `/products` → Listar todos los productos
 - **GET** `/products/sku` → Obtener un producto por ID
+
+
+---
+
+## 🧪 Tests
+
+El proyecto incluye tests unitarios escritos con **JUnit 5** y **Mockito**.
+
+Actualmente se han implementado tests mínimos para la clase `ProductServiceImpl`, que cubren los siguientes casos:
+- **`createProduct`**: valida que un producto se guarde y se mapee correctamente.
+- **`getProductBySku`**: comprueba la recuperación de un producto por SKU (tanto cuando existe como cuando no existe).
+- **`getAllProducts`**: verifica que se devuelva una lista vacía cuando no hay productos.
+
+Para ejecutar los tests, usa:
+````bash
+./mvnw test
+````
+
+---
+
+## 📈 Próximos pasos
+- Añadir más endpoints (usuarios, pedidos, categorías).
+- Implementar seguridad con Spring Security y JWT.
+- Implementar manejo avanzado de errores y validaciones.
+- Ampliar la cobertura de tests.
+
+
+---

@@ -9,5 +9,4 @@ class EcommerceApiApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

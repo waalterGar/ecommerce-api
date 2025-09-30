@@ -1,5 +1,7 @@
 # Ecommerce API 🛒
 
+> **Novedades de `feat/order`**: agregado completo de **Orders** (dominio + API), mapeos DTO, repositorio, servicio, controller y suite de tests de servicio.
+
 API REST de un **ecommerce ficticio**, desarrollada con **Spring Boot**, conectada a **MySQL** mediante **Spring Data JPA**.  
 Este proyecto sirve como base para demostrar mis habilidades en backend, aplicando buenas prácticas y ampliándolo progresivamente con seguridad, testing e integración en la nube.
 
@@ -90,25 +92,64 @@ Esto levantará:
 
 ---
 
+### 🧾 Orders
+
+> Requisitos: el `customerExternalId` y los `productSku` deben existir previamente.
+
+- **POST** `/orders` → Crear un pedido  
+  **Body ejemplo:**
+  ```json
+  {
+    "customerExternalId": "a1f4e12c-8d5c-4c1b-b3e1-7e2c1d123456",
+    "currency": "EUR",
+    "items": [
+      {
+        "productSku": "TSHIRT-BASIC-002",
+        "quantity": 2
+      }
+    ]
+  }
+  ```
+- **GET** `/orders/{externalId}` → Obtener un pedido por su `externalId`
+ **Nota**: actualmente, si no existe lanza `NoSuchElementException("Order not found")`.
+ (En una fase posterior se mapeará a HTTP 404 con ProblemDetail).
+
+- **GET** `/orders` → Listar todos los pedidos (con items y customer precargados)
+
+---
+
 ## 🧪 Tests
 
-El proyecto incluye tests unitarios escritos con **JUnit 5** y **Mockito**.
+El proyecto incluye tests unitarios con **JUnit 5** y **Mockito**.
+> Nota: Hay un `@SpringBootTest` de arranque de contexto (`EcommerceApiApplicationTests`) que **requiere la BD levantada**.
 
-Actualmente se han implementado tests mínimos para:
-- **`ProductServiceImpl`**:
-    - `createProduct`: valida que un producto se guarde y se mapee correctamente.
-    - `getProductBySku`: comprueba la recuperación de un producto por SKU (cuando existe y cuando no existe).
-    - `getAllProducts`: verifica que se devuelva una lista vacía cuando no hay productos.
-- **`CustomerServiceImpl`**:
-    - `createCustomer`: valida que un customer se guarde y se mapee correctamente.
-    - `getCustomerByExternalId`: comprueba la recuperación de un customer por externalId (cuando existe y cuando no existe).
-    - `getAllCustomers`: verifica que se devuelva una lista vacía cuando no hay customers.
+Cobertura actual:
 
-Para ejecutar los tests, usa:
+- **`ProductServiceImpl`**
+  - `createProduct`: guarda y mapea correctamente.
+  - `getProductBySku`: recupera por SKU (existe / no existe).
+  - `getAllProducts`: lista vacía si no hay productos.
+
+- **`CustomerServiceImpl`**
+  - `createCustomer`: guarda y mapea correctamente.
+  - `getCustomerByExternalId`: recupera por externalId (existe / no existe).
+  - `getAllCustomers`: lista vacía.
+
+- **`OrderServiceImpl`** (Mockito, sin contexto Spring)
+  - `getOrderByExternalId`: encontrado → DTO con items y totales
+  - `getOrderByExternalId`: no encontrado → lanza `NoSuchElementException("Order not found")`
+  - `getAllOrders`: lista vacía
+  - `getAllOrders`: con datos → valida `externalId` y `totalAmount`
+  - `createOrder`: happy-path → devuelve DTO con items y `totalAmount`
+  - `createOrder`: customer no existe → lanza y **no** guarda
+  - `createOrder`: product no existe → lanza y **no** guarda
+
+### Ejecutar tests
+Asegúrate de tener la base de datos en marcha:
 ```bash
+docker-compose up -d
 ./mvnw test
 ```
-
 ---
 
 ## 📈 Próximos pasos

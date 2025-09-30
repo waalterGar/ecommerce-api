@@ -49,7 +49,7 @@ class CustomerServiceImplTest {
         CustomerDto input = defaultDto();
         Customer saved = defaultEntity();
         saved.setId(UUID.randomUUID());          // simulate DB-generated ID
-        saved.setEmail(EMAIL.toLowerCase());     // normalized by entity
+        saved.setEmail(EMAIL.toLowerCase());
         when(customerRepository.save(any(Customer.class))).thenReturn(saved);
 
         // When

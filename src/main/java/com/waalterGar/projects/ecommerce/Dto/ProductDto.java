@@ -23,7 +23,8 @@ public class ProductDto {
     private Integer stockQuantity;
     private Boolean isActive;
 
-    public ProductDto(String sku, String name, String description, BigDecimal price, Currency currency, Integer stockQuantity, Boolean isActive) {
+    public ProductDto(String sku, String name, String description, BigDecimal price,
+                      Currency currency, Integer stockQuantity, Boolean isActive) {
         this.sku = sku;
         this.name = name;
         this.description = description;

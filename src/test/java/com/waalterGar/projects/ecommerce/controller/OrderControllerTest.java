@@ -1,0 +1,111 @@
+package com.waalterGar.projects.ecommerce.controller;
+
+import com.waalterGar.projects.ecommerce.Dto.OrderDto;
+import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
+import com.waalterGar.projects.ecommerce.service.OrderService;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.NoSuchElementException;
+
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(controllers = OrderController.class)
+@Import(GlobalExceptionHandler.class)
+@AutoConfigureMockMvc(addFilters = false)
+class OrderControllerTest {
+    private static final String BASE_URL = "/api/orders";
+    private static final String UNKNOWN_ORDER_ID = "ord-does-not-exist";
+    private static final String ORDER_ID = "ord-123";
+    private static final String UNKNOWN_URL = BASE_URL + "/" + UNKNOWN_ORDER_ID;
+    private static final String ORDER_URL = BASE_URL + "/" + ORDER_ID;
+
+    @Autowired MockMvc mvc;
+    @MockitoBean OrderService orderService;
+
+    @Test
+    void getByExternalId_found_returns200() throws Exception {
+        OrderDto dto = new OrderDto();
+        dto.setExternalId(ORDER_ID);
+        when(orderService.getOrderByExternalId(ORDER_ID)).thenReturn(dto);
+
+        mvc.perform(get(ORDER_URL))  // full path including class-level prefix
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(handler().handlerType(OrderController.class))
+                .andExpect(handler().methodName("getOrderByOrderNumber"))
+                .andExpect(jsonPath("$.externalId").value(ORDER_ID));
+
+        verify(orderService).getOrderByExternalId(ORDER_ID);
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void getByExternalId_missing_returns404_problem() throws Exception {
+
+        when(orderService.getOrderByExternalId(UNKNOWN_ORDER_ID))
+                .thenThrow(new NoSuchElementException("Order not found"));
+
+        mvc.perform(get(UNKNOWN_URL))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:not-found"))
+                .andExpect(jsonPath("$.title").value("Resource Not Found"))
+                .andExpect(jsonPath("$.detail").value("Order not found"))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.path").value(UNKNOWN_URL))
+                .andExpect(handler().handlerType(OrderController.class));
+
+        verify(orderService).getOrderByExternalId(UNKNOWN_ORDER_ID);
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void getByExternalId_badInput_returns400_problem() throws Exception {
+        // Arrange
+        String bad = "bad";
+        when(orderService.getOrderByExternalId(bad))
+                .thenThrow(new IllegalArgumentException("Invalid externalId"));
+
+        // Act + Assert
+        mvc.perform(get(BASE_URL + "/" + bad))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"))
+                .andExpect(jsonPath("$.detail").value("Invalid externalId"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(handler().handlerType(OrderController.class));
+
+        verify(orderService).getOrderByExternalId(bad);
+        verifyNoMoreInteractions(orderService);
+    }
+
+
+    @Disabled("Will pass once Bean Validation (@Valid + constraints) is added to createOrderDto/createOrderItemDto")
+    @Test
+    void createOrder_invalidPayload_returns400_problem() throws Exception {
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Validation Failed"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.errors").exists());
+
+        // When validation is in place, also assert:
+        // verify(orderService, never()).createOrder(any());
+    }
+}

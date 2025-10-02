@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(GlobalExceptionHandler.class)
 @AutoConfigureMockMvc(addFilters = false)
 class OrderControllerTest {
-    private static final String BASE_URL = "/api/orders";
+    private static final String BASE_URL = "/orders";
     private static final String UNKNOWN_ORDER_ID = "ord-does-not-exist";
     private static final String ORDER_ID = "ord-123";
     private static final String UNKNOWN_URL = BASE_URL + "/" + UNKNOWN_ORDER_ID;

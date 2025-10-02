@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
-@RequestMapping("/api/orders")
+@RequestMapping("/orders")
 @RestController
 public class OrderController {
     private final OrderService orderService;

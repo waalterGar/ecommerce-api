@@ -1,8 +1,6 @@
 # Ecommerce API 🛒
 
-> **Novedades de `chore/global-error-handling`**: manejo **global** de errores con **ProblemDetail (RFC 7807)** y test slice de `OrderController`.
-
-> **Novedades de `feat/order`**: agregado completo de **Orders** (dominio + API), mapeos DTO, repositorio, servicio, controller y suite de tests de servicio.
+> **Novedades de `feat/validation`**: validación mínima en DTOs de Orders (`@Valid`, `@NotBlank`, `@NotEmpty`, `@Positive`, `@NotNull`) y habilitado el test **POST inválido → 400**; además, se mapea `UnexpectedTypeException` a **400** como guardarraíl de validación.
 ---
 ## 📋 Descripción
 
@@ -115,6 +113,18 @@ Esto levantará:
 
 - **GET** `/api/orders` → Listar todos los pedidos (con items y customer precargados)
 
+
+**Validación de entrada (createOrder)**  
+Se aplica validación de Bean Validation en el payload:
+- `customerExternalId`: **@NotBlank**
+- `items`: **@NotEmpty**
+  - cada item:
+    - `productSku`: **@NotBlank**
+    - `quantity`: **@Positive** (mayor que 0)
+- `currency`: **@NotNull** (enum soportado: `EUR`)
+
+Si la validación falla, se devuelve **400** con `application/problem+json` y un mapa `errors` por campo.
+
 ---
 
 ## ❗ Manejo global de errores (ProblemDetail)
@@ -148,7 +158,23 @@ Ejemplos:
 }
 ```
 
-> **Validaciones (próxima fase)**: cuando se añada `@Valid` a los DTOs, los errores de validación devolverán **400** con un mapa `errors` por campo.
+**400 Bad Request** (errores de validación en el cuerpo de la petición)
+```json
+{
+  "type": "urn:problem:validation",
+  "title": "Validation Failed",
+  "status": 400,
+  "detail": "One or more fields are invalid.",
+  "path": "/api/orders",
+  "timestamp": "2025-10-02T18:00:00Z",
+  "errors": {
+    "customerExternalId": "customerExternalId is required",
+    "items": "items must not be empty"
+  }
+}
+```
+
+> **Nota**: si se produce una configuración errónea de una constraint (p. ej., usar `@NotBlank` en un enum), el sistema devuelve **400** con `type: urn:problem:validation` gracias al handler para `UnexpectedTypeException`.
 
 ---
 
@@ -183,6 +209,7 @@ Cobertura actual:
   - `GET /api/orders/{id}` (no existe) → **404** `application/problem+json`.
   - `GET /api/orders/{id}` (input inválido) → **400** `application/problem+json`.
   - `POST /api/orders` inválido → **@Disabled** (se habilitará en la fase de **Validación**).
+  - (Guardarraíl) `UnexpectedTypeException` → **400** `application/problem+json` (type: `urn:problem:validation`).
 
 ### Ejecutar tests
 - **Sólo el slice web (no requiere BD):**

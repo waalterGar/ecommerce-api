@@ -3,6 +3,7 @@ package com.waalterGar.projects.ecommerce.controller;
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
 import com.waalterGar.projects.ecommerce.service.OrderService;
+import jakarta.validation.UnexpectedTypeException;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,9 +94,11 @@ class OrderControllerTest {
     }
 
 
-    @Disabled("Will pass once Bean Validation (@Valid + constraints) is added to createOrderDto/createOrderItemDto")
-    @Test
+   @Test
     void createOrder_invalidPayload_returns400_problem() throws Exception {
+       doAnswer(inv -> { throw new AssertionError("Service should not be called for invalid payload"); })
+               .when(orderService).createOrder(any());
+
         mvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -105,7 +108,33 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.errors").exists());
 
-        // When validation is in place, also assert:
-        // verify(orderService, never()).createOrder(any());
+        verify(orderService, never()).createOrder(any());
+    }
+
+    @Test
+    void createOrder_unexpectedTypeException_returns400_problem() throws Exception {
+        // Arrange: valid payload so it doesn't fail earlier
+        String validPayload = """
+      {
+        "customerExternalId": "cust-123",
+        "currency": "USD",
+        "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
+      }""";
+
+        when(orderService.createOrder(any()))
+                .thenThrow(new UnexpectedTypeException("HV000030: No validator for ..."));
+
+        // Act + Assert
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validPayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:validation"))
+                .andExpect(jsonPath("$.title").value("Invalid Constraint Configuration"))
+                .andExpect(handler().handlerType(OrderController.class));
+
+        verify(orderService).createOrder(any());
+        verifyNoMoreInteractions(orderService);
     }
 }

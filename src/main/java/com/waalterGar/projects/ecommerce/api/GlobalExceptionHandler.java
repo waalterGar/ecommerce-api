@@ -2,6 +2,7 @@ package com.waalterGar.projects.ecommerce.api;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.UnexpectedTypeException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -57,6 +58,17 @@ public class GlobalExceptionHandler {
         );
         pd.setProperty("errors", parameterErrors(ex));
         return pd;
+    }
+
+    @ExceptionHandler(UnexpectedTypeException.class)
+    public ProblemDetail handleUnexpectedType(UnexpectedTypeException ex, HttpServletRequest req) {
+         return pd(
+                HttpStatus.BAD_REQUEST,
+                "Invalid Constraint Configuration",
+                "A server configuration error occurred.",
+                TYPE_VALIDATION,
+                req
+        );
     }
 
     @ExceptionHandler(Exception.class)

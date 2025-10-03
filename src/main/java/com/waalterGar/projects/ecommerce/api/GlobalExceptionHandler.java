@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 import java.net.URI;
 import java.time.Instant;
@@ -30,6 +32,9 @@ public class GlobalExceptionHandler {
     private static final URI TYPE_MISSING_PARAM   = URI.create("urn:problem:missing-param");
     private static final URI TYPE_NO_RESOURCE     = URI.create("urn:problem:no-resource");
     private static final URI TYPE_UNEXPECTED      = URI.create("urn:problem:unexpected");
+    private static final URI TYPE_UNSUPPORTED_MEDIA = URI.create("urn:problem:unsupported-media-type");
+    private static final URI TYPE_NOT_ACCEPTABLE    = URI.create("urn:problem:not-acceptable");
+
 
     @ExceptionHandler(NoSuchElementException.class)
     public ProblemDetail handleNotFound(NoSuchElementException ex, HttpServletRequest req) {
@@ -103,6 +108,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNoResource(NoResourceFoundException ex, HttpServletRequest req) {
         return pd(HttpStatus.NOT_FOUND, "No Resource Found", ex.getMessage(), TYPE_NO_RESOURCE, req);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ProblemDetail handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex, HttpServletRequest req) {
+        return pd(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type", ex.getMessage(), TYPE_UNSUPPORTED_MEDIA, req);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ProblemDetail handleNotAcceptable(HttpMediaTypeNotAcceptableException ex, HttpServletRequest req) {
+        return pd(HttpStatus.NOT_ACCEPTABLE, "Not Acceptable", ex.getMessage(), TYPE_NOT_ACCEPTABLE, req);
     }
 
     @ExceptionHandler(Exception.class)

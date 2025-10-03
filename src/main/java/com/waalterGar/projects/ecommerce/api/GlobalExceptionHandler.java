@@ -5,9 +5,12 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.UnexpectedTypeException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.time.Instant;
@@ -19,10 +22,14 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final URI TYPE_NOT_FOUND   = URI.create("urn:problem:not-found");
-    private static final URI TYPE_INVALID     = URI.create("urn:problem:invalid-request");
-    private static final URI TYPE_VALIDATION  = URI.create("urn:problem:validation");
-    private static final URI TYPE_UNEXPECTED  = URI.create("urn:problem:unexpected");
+    private static final URI TYPE_NOT_FOUND       = URI.create("urn:problem:not-found");
+    private static final URI TYPE_INVALID = URI.create("urn:problem:invalid-request");
+    private static final URI TYPE_VALIDATION      = URI.create("urn:problem:validation");
+    private static final URI TYPE_MALFORMED_JSON  = URI.create("urn:problem:malformed-json");
+    private static final URI TYPE_TYPE_MISMATCH   = URI.create("urn:problem:type-mismatch");
+    private static final URI TYPE_MISSING_PARAM   = URI.create("urn:problem:missing-param");
+    private static final URI TYPE_NO_RESOURCE     = URI.create("urn:problem:no-resource");
+    private static final URI TYPE_UNEXPECTED      = URI.create("urn:problem:unexpected");
 
     @ExceptionHandler(NoSuchElementException.class)
     public ProblemDetail handleNotFound(NoSuchElementException ex, HttpServletRequest req) {
@@ -71,9 +78,36 @@ public class GlobalExceptionHandler {
         );
     }
 
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleMalformedJson(HttpMessageNotReadableException ex, HttpServletRequest req) {
+        String detail = ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage()
+                : "Malformed JSON request body.";
+        return pd(HttpStatus.BAD_REQUEST, "Malformed JSON", detail, TYPE_MALFORMED_JSON, req);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
+        String param = ex.getName();
+        String expected = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+        String detail = "Parameter '%s' should be of type '%s'.".formatted(param, expected);
+        return pd(HttpStatus.BAD_REQUEST, "Type Mismatch", detail, TYPE_TYPE_MISMATCH, req);
+    }
+
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingParam(org.springframework.web.bind.MissingServletRequestParameterException ex, HttpServletRequest req) {
+        String detail = "Missing required parameter '%s' of type '%s'.".formatted(ex.getParameterName(), ex.getParameterType());
+        return pd(HttpStatus.BAD_REQUEST, "Missing Parameter", detail, TYPE_MISSING_PARAM, req);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResource(NoResourceFoundException ex, HttpServletRequest req) {
+        return pd(HttpStatus.NOT_FOUND, "No Resource Found", ex.getMessage(), TYPE_NO_RESOURCE, req);
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex, HttpServletRequest req) {
-        // Keep details generic for 500s; log ex server-side if/when you add a logger.
         return pd(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "Unexpected error.", TYPE_UNEXPECTED, req);
     }
 

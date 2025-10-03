@@ -22,6 +22,8 @@ Este proyecto sirve como base para demostrar mis habilidades en backend, aplican
 
 ## ⚙️ Configuración y ejecución
 
+> **server.servlet.context-path=/api** → todos los endpoints viven bajo `/api`.
+
 ### 1. Variables de entorno
 Crea un archivo `.env` en la raíz del proyecto con las siguientes variables (⚠️ el archivo está en `.gitignore` y no se versiona):
 
@@ -96,7 +98,7 @@ Esto levantará:
 ### 🧾 Orders
 > Requisitos: el `customerExternalId` y los `productSku` deben existir previamente.
 
-- **POST** `/api/orders` → Crear un pedido  
+- **POST** `/api/orders` → Crear un pedido
   **Body ejemplo:**
   ```json
   {
@@ -107,6 +109,13 @@ Esto levantará:
     ]
   }
   ```
+  **Respuesta (201 Created)**
+```json
+  {
+    "externalId": "ord-xyz"
+  }
+```
+
 
 - **GET** `/api/orders/{externalId}` → Obtener un pedido por su `externalId`  
   **Nota**: actualmente, si no existe lanza `NoSuchElementException("Order not found")`, que se mapea a **HTTP 404** mediante el handler global.
@@ -179,6 +188,30 @@ Todas las respuestas de error incluyen: `type`, `title`, `status`, `detail`, `pa
 }
 ```
 
+**415 Unsupported Media Type** (cabecera `Content-Type` no soportada)
+```json
+{
+  "type": "urn:problem:unsupported-media-type",
+  "title": "Unsupported Media Type",
+  "status": 415,
+  "detail": "Content type 'text/plain' not supported",
+  "path": "/api/orders",
+  "timestamp": "2025-10-02T18:00:00Z"
+}
+```
+
+**406 Not Acceptable** (cabecera `Accept` no negociable)
+```json
+{
+  "type": "urn:problem:not-acceptable",
+  "title": "Not Acceptable",
+  "status": 406,
+  "detail": "Could not find acceptable representation",
+  "path": "/api/orders",
+  "timestamp": "2025-10-02T18:00:00Z"
+}
+```
+
 > **Nota**: si se produce una configuración errónea de una constraint (p. ej., usar `@NotBlank` en un enum), el sistema devuelve **400** con `type: urn:problem:validation` gracias al handler para `UnexpectedTypeException`.
 
 ---
@@ -195,10 +228,12 @@ Cobertura actual:
   - `getProductBySku`: recupera por SKU (existe / no existe).
   - `getAllProducts`: lista vacía si no hay productos.
 
+
 - **`CustomerServiceImpl`**
   - `createCustomer`: guarda y mapea correctamente.
   - `getCustomerByExternalId`: recupera por `externalId` (existe / no existe).
   - `getAllCustomers`: lista vacía.
+
 
 - **`OrderServiceImpl`** (Mockito, sin contexto Spring)
   - `getOrderByExternalId`: encontrado → DTO con items y totales.
@@ -209,12 +244,17 @@ Cobertura actual:
   - `createOrder`: customer no existe → lanza y **no** guarda.
   - `createOrder`: product no existe → lanza y **no** guarda.
 
-- **`OrderController`** (web slice, `@WebMvcTest` + handler global)
+
+- **`OrderController`** (slice web, `@WebMvcTest` + handler global)
   - `GET /api/orders/{id}` → **200** y JSON de pedido.
   - `GET /api/orders/{id}` (no existe) → **404** `application/problem+json`.
   - `GET /api/orders/{id}` (input inválido) → **400** `application/problem+json`.
-  - `POST /api/orders` inválido → **@Disabled** (se habilitará en la fase de **Validación**).
-  - (Guardarraíl) `UnexpectedTypeException` → **400** `application/problem+json` (type: `urn:problem:validation`).
+  - `POST /api/orders` **válido** → **201** y JSON con `externalId`.
+  - `POST /api/orders` **mal JSON** → **400** `application/problem+json`.
+  - `POST /api/orders` **Content-Type no soportado** → **415** `application/problem+json`.
+  - `POST /api/orders` **Accept no negociable** → **406** `application/problem+json`.
+  - Ruta desconocida → **404** `application/problem+json`.
+
 
 ### Ejecutar tests
 - **Sólo el slice web (no requiere BD):**

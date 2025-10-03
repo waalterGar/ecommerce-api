@@ -164,4 +164,71 @@ class OrderControllerTest {
 
         verifyNoInteractions(orderService);
     }
+
+    @Test
+    void createOrder_valid_returns201_withBody() throws Exception {
+        String payload = """
+      {
+        "customerExternalId": "cust-123",
+        "currency": "EUR",
+        "items": [ { "productSku": "SKU-1", "quantity": 2 } ]
+      }""";
+
+        OrderDto returned = new OrderDto();
+        returned.setExternalId("ord-xyz");
+
+        when(orderService.createOrder(any())).thenReturn(returned);
+
+        mvc.perform(post(BASE_URL) // BASE_URL = "/api/orders"
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.externalId").value("ord-xyz"))
+                .andExpect(handler().handlerType(OrderController.class))
+                .andExpect(handler().methodName("createOrder"));
+
+        verify(orderService).createOrder(any());
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void createOrder_unsupportedMediaType_returns415_problem() throws Exception {
+        String badPayload = "this is not json";
+
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.TEXT_PLAIN) // wrong content type
+                        .content(badPayload))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:unsupported-media-type"))
+                .andExpect(jsonPath("$.title").value("Unsupported Media Type"));
+
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void createOrder_notAcceptable_returns406_problem() throws Exception {
+        String payload = """
+      {
+        "customerExternalId": "cust-123",
+        "currency": "EUR",
+        "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
+      }
+    """;
+
+        OrderDto dto = new OrderDto();
+        dto.setExternalId("ord-abc");
+        when(orderService.createOrder(any())).thenReturn(dto);
+
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_PLAIN) // client only accepts text/plain
+                        .content(payload))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:not-acceptable"))
+                .andExpect(jsonPath("$.title").value("Not Acceptable"));
+    }
 }

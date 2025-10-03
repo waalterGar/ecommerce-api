@@ -164,4 +164,32 @@ class OrderControllerTest {
 
         verifyNoInteractions(orderService);
     }
+
+    @Test
+    void createOrder_valid_returns201_withBody() throws Exception {
+        String payload = """
+      {
+        "customerExternalId": "cust-123",
+        "currency": "EUR",
+        "items": [ { "productSku": "SKU-1", "quantity": 2 } ]
+      }""";
+
+        OrderDto returned = new OrderDto();
+        returned.setExternalId("ord-xyz");
+
+        when(orderService.createOrder(any())).thenReturn(returned);
+
+        mvc.perform(post(BASE_URL) // BASE_URL = "/api/orders"
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.externalId").value("ord-xyz"))
+                .andExpect(handler().handlerType(OrderController.class))
+                .andExpect(handler().methodName("createOrder"));
+
+        verify(orderService).createOrder(any());
+        verifyNoMoreInteractions(orderService);
+    }
 }

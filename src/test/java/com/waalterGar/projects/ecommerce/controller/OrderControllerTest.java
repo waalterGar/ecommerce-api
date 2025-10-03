@@ -137,4 +137,31 @@ class OrderControllerTest {
         verify(orderService).createOrder(any());
         verifyNoMoreInteractions(orderService);
     }
+
+    @Test
+    void createOrder_malformedJson_returns400_problem() throws Exception {
+        String badJson = "{ \"customerExternalId\": \"cust-123\", \"items\": [ { \"productSku\": \"SKU-1\", \"quantity\": 1 } ]"; // missing closing }
+
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(badJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:malformed-json"))
+                .andExpect(jsonPath("$.title").value("Malformed JSON"))
+                .andExpect(handler().handlerType(OrderController.class)); // mapping matched OrderController before read failed
+
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void unknownRoute_returns404_problem() throws Exception {
+        mvc.perform(get("/api/does-not-exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:no-resource"))
+                .andExpect(jsonPath("$.title").value("No Resource Found"));
+
+        verifyNoInteractions(orderService);
+    }
 }

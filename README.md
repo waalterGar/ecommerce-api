@@ -132,9 +132,14 @@ Si la validación falla, se devuelve **400** con `application/problem+json` y un
 La API estandariza los errores usando **RFC 7807 – `application/problem+json`**.  
 Todas las respuestas de error incluyen: `type`, `title`, `status`, `detail`, `path`, `timestamp`.
 
-Ejemplos:
+- **400** `urn:problem:malformed-json` — cuerpo JSON mal formado.
 
-**404 Not Found** (recurso no encontrado, p.ej. `NoSuchElementException`)
+
+- **404** `urn:problem:no-resource` — ruta no mapeada/recurso no encontrado.
+
+
+
+- **404 Not Found** (recurso no encontrado, p.ej. `NoSuchElementException`)
 ```json
 {
   "type": "urn:problem:not-found",
@@ -146,7 +151,7 @@ Ejemplos:
 }
 ```
 
-**400 Bad Request** (entrada inválida, p.ej. `IllegalArgumentException`)
+- **400 Bad Request** (entrada inválida, p.ej. `IllegalArgumentException`)
 ```json
 {
   "type": "urn:problem:invalid-request",
@@ -158,7 +163,7 @@ Ejemplos:
 }
 ```
 
-**400 Bad Request** (errores de validación en el cuerpo de la petición)
+- **400 Bad Request** (errores de validación en el cuerpo de la petición)
 ```json
 {
   "type": "urn:problem:validation",

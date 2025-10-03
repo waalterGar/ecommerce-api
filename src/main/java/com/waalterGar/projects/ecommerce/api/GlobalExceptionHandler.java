@@ -78,7 +78,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleMalformedJson(HttpMessageNotReadableException ex, HttpServletRequest req) {
         String detail = ex.getMostSpecificCause() != null

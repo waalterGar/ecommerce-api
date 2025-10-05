@@ -1,7 +1,11 @@
 # Ecommerce API 🛒
 
+> **Novedades de `test/jpa-with-testcontainers`**: tests de persistencia con **MySQL Testcontainers**; ITs del repositorio de Orders (**distinct roots**, **orphanRemoval**, **cascade persist**); builders de test ajustados (listas **mutables** + back-refs vía `Order.addItem/removeItem`); smoke `@SpringBootTest` configurado para usar el contenedor.
+>
 > **Novedades de `feat/validation`**: validación mínima en DTOs de Orders (`@Valid`, `@NotBlank`, `@NotEmpty`, `@Positive`, `@NotNull`) y habilitado el test **POST inválido → 400**; además, se mapea `UnexpectedTypeException` a **400** como guardarraíl de validación.
+
 ---
+
 ## 📋 Descripción
 
 API REST de un **ecommerce ficticio**, desarrollada con **Spring Boot**, conectada a **MySQL** mediante **Spring Data JPA**.  
@@ -17,12 +21,13 @@ Este proyecto sirve como base para demostrar mis habilidades en backend, aplican
 - **MySQL 8** (contenedor Docker)
 - **Docker Compose**
 - **Maven**
+- **Testcontainers** (tests de persistencia con MySQL real en contenedor)
 
 ---
 
 ## ⚙️ Configuración y ejecución
 
-> **server.servlet.context-path=/api** → todos los endpoints viven bajo `/api`.
+> `server.servlet.context-path=/api` → todos los endpoints viven bajo `/api`.
 
 ### 1. Variables de entorno
 Crea un archivo `.env` en la raíz del proyecto con las siguientes variables (⚠️ el archivo está en `.gitignore` y no se versiona):
@@ -34,13 +39,12 @@ MYSQL_PASSWORD=ecommerce_pass
 MYSQL_ROOT_PASSWORD=rootpass
 ```
 
-### 2. Levantar la base de datos con Docker
+### 2. Levantar la base de datos para ejecutar la **aplicación**
 En la raíz del proyecto:
 ```bash
 docker-compose up -d
 ```
 Esto levantará:
-
 - MySQL en el puerto 3306
 - (Opcional) phpMyAdmin en http://localhost:8081
 
@@ -48,6 +52,8 @@ Esto levantará:
 ```bash
 ./mvnw spring-boot:run
 ```
+
+> 🔎 **Tests**: no necesitas `docker-compose` para ejecutar los tests de persistencia; **Testcontainers** arranca un MySQL efímero automáticamente.
 
 ---
 
@@ -98,7 +104,7 @@ Esto levantará:
 ### 🧾 Orders
 > Requisitos: el `customerExternalId` y los `productSku` deben existir previamente.
 
-- **POST** `/api/orders` → Crear un pedido
+- **POST** `/api/orders` → Crear un pedido  
   **Body ejemplo:**
   ```json
   {
@@ -110,21 +116,17 @@ Esto levantará:
   }
   ```
   **Respuesta (201 Created)**
-```json
-  {
-    "externalId": "ord-xyz"
-  }
-```
-
+  ```json
+  { "externalId": "ord-xyz" }
+  ```
 
 - **GET** `/api/orders/{externalId}` → Obtener un pedido por su `externalId`  
-  **Nota**: actualmente, si no existe lanza `NoSuchElementException("Order not found")`, que se mapea a **HTTP 404** mediante el handler global.
+  **Nota**: si no existe, lanza `NoSuchElementException("Order not found")`, que se mapea a **HTTP 404** mediante el handler global.
 
 - **GET** `/api/orders` → Listar todos los pedidos (con items y customer precargados)
 
-
 **Validación de entrada (createOrder)**  
-Se aplica validación de Bean Validation en el payload:
+Se aplica Bean Validation en el payload:
 - `customerExternalId`: **@NotBlank**
 - `items`: **@NotEmpty**
   - cada item:
@@ -142,135 +144,109 @@ La API estandariza los errores usando **RFC 7807 – `application/problem+json`*
 Todas las respuestas de error incluyen: `type`, `title`, `status`, `detail`, `path`, `timestamp`.
 
 - **400** `urn:problem:malformed-json` — cuerpo JSON mal formado.
-
-
 - **404** `urn:problem:no-resource` — ruta no mapeada/recurso no encontrado.
-
-
-
-- **404 Not Found** (recurso no encontrado, p.ej. `NoSuchElementException`)
-```json
-{
-  "type": "urn:problem:not-found",
-  "title": "Resource Not Found",
-  "status": 404,
-  "detail": "Order not found",
-  "path": "/api/orders/ord-does-not-exist",
-  "timestamp": "2025-10-01T18:00:00Z"
-}
-```
-
-- **400 Bad Request** (entrada inválida, p.ej. `IllegalArgumentException`)
-```json
-{
-  "type": "urn:problem:invalid-request",
-  "title": "Invalid Request",
-  "status": 400,
-  "detail": "Invalid externalId",
-  "path": "/api/orders/bad",
-  "timestamp": "2025-10-01T18:00:00Z"
-}
-```
-
-- **400 Bad Request** (errores de validación en el cuerpo de la petición)
-```json
-{
-  "type": "urn:problem:validation",
-  "title": "Validation Failed",
-  "status": 400,
-  "detail": "One or more fields are invalid.",
-  "path": "/api/orders",
-  "timestamp": "2025-10-02T18:00:00Z",
-  "errors": {
-    "customerExternalId": "customerExternalId is required",
-    "items": "items must not be empty"
+- **404** `urn:problem:not-found` — recurso inexistente (p. ej. `NoSuchElementException`).
+  ```json
+  {
+    "type": "urn:problem:not-found",
+    "title": "Resource Not Found",
+    "status": 404,
+    "detail": "Order not found",
+    "path": "/api/orders/ord-does-not-exist",
+    "timestamp": "2025-10-01T18:00:00Z"
   }
-}
-```
+  ```
+- **400** `urn:problem:invalid-request` — petición inválida (p. ej. `IllegalArgumentException`).
+  ```json
+  {
+    "type": "urn:problem:invalid-request",
+    "title": "Invalid Request",
+    "status": 400,
+    "detail": "Invalid externalId",
+    "path": "/api/orders/bad",
+    "timestamp": "2025-10-01T18:00:00Z"
+  }
+  ```
+- **400** `urn:problem:validation` — errores de validación en el cuerpo.
+  ```json
+  {
+    "type": "urn:problem:validation",
+    "title": "Validation Failed",
+    "status": 400,
+    "detail": "One or more fields are invalid.",
+    "path": "/api/orders",
+    "timestamp": "2025-10-02T18:00:00Z",
+    "errors": {
+      "customerExternalId": "customerExternalId is required",
+      "items": "items must not be empty"
+    }
+  }
+  ```
+- **415** `urn:problem:unsupported-media-type` — `Content-Type` no soportado.
+- **406** `urn:problem:not-acceptable` — `Accept` no negociable.
 
-**415 Unsupported Media Type** (cabecera `Content-Type` no soportada)
-```json
-{
-  "type": "urn:problem:unsupported-media-type",
-  "title": "Unsupported Media Type",
-  "status": 415,
-  "detail": "Content type 'text/plain' not supported",
-  "path": "/api/orders",
-  "timestamp": "2025-10-02T18:00:00Z"
-}
-```
-
-**406 Not Acceptable** (cabecera `Accept` no negociable)
-```json
-{
-  "type": "urn:problem:not-acceptable",
-  "title": "Not Acceptable",
-  "status": 406,
-  "detail": "Could not find acceptable representation",
-  "path": "/api/orders",
-  "timestamp": "2025-10-02T18:00:00Z"
-}
-```
-
-> **Nota**: si se produce una configuración errónea de una constraint (p. ej., usar `@NotBlank` en un enum), el sistema devuelve **400** con `type: urn:problem:validation` gracias al handler para `UnexpectedTypeException`.
+> **Nota**: si se configura mal una constraint (p. ej., `@NotBlank` en un enum), el sistema devuelve **400** con `type: urn:problem:validation` gracias al handler de `UnexpectedTypeException`.
 
 ---
 
 ## 🧪 Tests
 
-El proyecto incluye tests unitarios con **JUnit 5** y **Mockito**.
-> Nota: hay un `@SpringBootTest` de arranque de contexto (`EcommerceApiApplicationTests`) que **requiere la BD levantada**.
-
-Cobertura actual:
+El proyecto incluye tests unitarios (JUnit 5 + Mockito), slice web y **tests de integración JPA con Testcontainers**.
 
 - **`ProductServiceImpl`**
   - `createProduct`: guarda y mapea correctamente.
   - `getProductBySku`: recupera por SKU (existe / no existe).
   - `getAllProducts`: lista vacía si no hay productos.
 
-
 - **`CustomerServiceImpl`**
   - `createCustomer`: guarda y mapea correctamente.
   - `getCustomerByExternalId`: recupera por `externalId` (existe / no existe).
   - `getAllCustomers`: lista vacía.
 
-
 - **`OrderServiceImpl`** (Mockito, sin contexto Spring)
   - `getOrderByExternalId`: encontrado → DTO con items y totales.
-  - `getOrderByExternalId`: no encontrado → lanza `NoSuchElementException("Order not found")`.
-  - `getAllOrders`: lista vacía.
-  - `getAllOrders`: con datos → valida `externalId` y `totalAmount`.
+  - `getOrderByExternalId`: no encontrado → `NoSuchElementException`.
+  - `getAllOrders`: lista vacía / con datos (valida `externalId` y `totalAmount`).
   - `createOrder`: happy-path → devuelve DTO con items y `totalAmount`.
   - `createOrder`: customer no existe → lanza y **no** guarda.
   - `createOrder`: product no existe → lanza y **no** guarda.
 
-
 - **`OrderController`** (slice web, `@WebMvcTest` + handler global)
   - `GET /api/orders/{id}` → **200** y JSON de pedido.
-  - `GET /api/orders/{id}` (no existe) → **404** `application/problem+json`.
-  - `GET /api/orders/{id}` (input inválido) → **400** `application/problem+json`.
-  - `POST /api/orders` **válido** → **201** y JSON con `externalId`.
-  - `POST /api/orders` **mal JSON** → **400** `application/problem+json`.
-  - `POST /api/orders` **Content-Type no soportado** → **415** `application/problem+json`.
-  - `POST /api/orders` **Accept no negociable** → **406** `application/problem+json`.
-  - Ruta desconocida → **404** `application/problem+json`.
+  - `GET /api/orders/{id}` (no existe) → **404** problem.
+  - `GET /api/orders/{id}` (input inválido) → **400** problem.
+  - `POST /api/orders` **válido** → **201** JSON con `externalId`.
+  - `POST /api/orders` **mal JSON** → **400** problem.
+  - `POST /api/orders` **Content-Type no soportado** → **415** problem.
+  - `POST /api/orders` **Accept no negociable** → **406** problem.
+  - Ruta desconocida → **404** problem.
 
+- **`OrderRepositoryIT`** (JPA + **MySQL Testcontainers**)
+  - **Distinct roots**: `findAllWithItemsAndCustomer` devuelve órdenes **sin duplicar** y con conteo correcto de items.
+  - **Orphan removal**: eliminar un item del agregado lo borra en DB (`orphanRemoval = true`).
+  - **Cascade persist**: guardar sólo el `Order` persiste también sus `OrderItem`s; se validan IDs y back-refs.
 
 ### Ejecutar tests
 - **Sólo el slice web (no requiere BD):**
   ```bash
   ./mvnw -Dtest=*ControllerTest test
   ```
-- **Suite completa** (requiere MySQL con Docker Compose):
+- **Sólo los IT de repositorio (arranca Testcontainers automáticamente):**
   ```bash
-  docker-compose up -d
+  ./mvnw -Dtest='*OrderRepositoryIT' test
+  ```
+- **Suite completa**:
+  ```bash
   ./mvnw test
   ```
+
+> Testcontainers descarga imágenes la primera vez; posteriores ejecuciones son más rápidas.
 
 ---
 
 ## 📈 Próximos pasos
-- Añadir más endpoints (pedidos, categorías).
-- Implementar seguridad con Spring Security y JWT.
-- Implementar manejo avanzado de errores y validaciones.
-- Ampliar la cobertura de tests.
+- Reglas de negocio (v1): stock mínimo, decremento de stock, totales “autoritativos”, estado inicial `NEW`, transaccionalidad, 422 (insufficient stock) con ProblemDetail.
+- Añadir más endpoints (categorías, etc.).
+- Seguridad con Spring Security + JWT.
+- Validaciones adicionales y manejo avanzado de errores.
+- Ampliar la cobertura de tests end-to-end.

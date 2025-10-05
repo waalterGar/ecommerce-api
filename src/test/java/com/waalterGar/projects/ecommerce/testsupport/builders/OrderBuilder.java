@@ -29,8 +29,10 @@ public class OrderBuilder {
         o.setExternalId(externalId);
         o.setStatus(status);
         o.setCurrency(currency);
-        o.setCustomer(customer); // ensures no NPEs
-        o.setItems(List.copyOf(items));
+        o.setCustomer(customer);
+
+        for (OrderItem it : items) {o.addItem(it);}
+
         BigDecimal total = items.stream()
                 .map(OrderItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

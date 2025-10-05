@@ -37,6 +37,7 @@ class OrderRepositoryIT {
     private static final String CUSTOMER_EXT_ID_A  = "cust-A";
     private static final String ORDER_EXT_ID_1     = "ord-it-1";
     private static final String ORDER_EXT_ID_2     = "ord-it-2";
+    private static final String ORDER_EXT_ID_3  = "ord-it-3";
     private static final String SKU_MUG            = "MUG-LOGO-001";
     private static final String NAME_MUG           = "Logo Mug";
     private static final String SKU_TSHIRT         = "TSHIRT-LOGO-001";
@@ -121,6 +122,31 @@ class OrderRepositoryIT {
         return customerRepository.save(
                 new CustomerBuilder().withExternalId(externalId).build()
         );
+    }
+
+    @Test
+    void savingOrder_cascadesItemsPersist() {
+        // Arrange
+        Customer savedCustomer = savedCustomer(CUSTOMER_EXT_ID);
+        Order o = orderWith(savedCustomer, ORDER_EXT_ID_3,
+                item(SKU_MUG, NAME_MUG, QTY_ONE, PRICE_MUG),
+                item(SKU_TSHIRT, NAME_TSHIRT, QTY_TWO, PRICE_TSHIRT)
+        );
+
+        orderRepository.saveAndFlush(o);
+
+        // Act
+        List<Order> result = orderRepository.findAllWithItemsAndCustomer();
+
+        // Assert
+        Order reloaded = getByExternalId(result, ORDER_EXT_ID_3);
+        assertThat(reloaded.getItems()).hasSize(2);
+
+        assertThat(reloaded.getItems()).allSatisfy(it -> {
+            assertThat(it.getId()).as("item id should be generated").isNotNull();
+            assertThat(it.getOrder()).isNotNull();
+            assertThat(it.getOrder().getExternalId()).isEqualTo(ORDER_EXT_ID_3);
+        });
     }
 
     private OrderItem item(String sku, String name, int quantity, BigDecimal unitPrice) {

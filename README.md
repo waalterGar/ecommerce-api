@@ -53,7 +53,22 @@ Esto levantará:
 ./mvnw spring-boot:run
 ```
 
+_Tras iniciar la app, puedes navegar a **Swagger UI** en `http://localhost:8080/api/swagger-ui/index.html`._
+
 > 🔎 **Tests**: no necesitas `docker-compose` para ejecutar los tests de persistencia; **Testcontainers** arranca un MySQL efímero automáticamente.
+
+---
+
+## 📖 API Docs (OpenAPI / Swagger)
+
+La API expone documentación OpenAPI y una UI interactiva:
+
+- **Swagger UI**: `http://localhost:8080/api/swagger-ui/index.html`
+- **Esquema OpenAPI (JSON)**: `http://localhost:8080/api/v3/api-docs`
+
+Notas:
+- La documentación se genera automáticamente a partir de los **controladores** y **DTOs**.
+- Los **errores** siguen **RFC 7807** (`application/problem+json`) mediante el **handler global**.
 
 ---
 

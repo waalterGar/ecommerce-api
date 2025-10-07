@@ -2,6 +2,11 @@ package com.waalterGar.projects.ecommerce.controller;
 
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Products", description = "Manage products")
 @RequiredArgsConstructor
 @RequestMapping("/products")
 @RestController
@@ -27,6 +33,7 @@ public class ProductController {
         return new ResponseEntity<>(createdProduct, HttpStatus.CREATED);
     }
 
+    @Operation(summary = "Get product by SKU")
     @GetMapping("/{sku}")
     public ResponseEntity<ProductDto> getProductBySku(@PathVariable String sku) {
         ProductDto product = productService.getProductBySku(sku);

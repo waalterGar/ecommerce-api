@@ -51,6 +51,7 @@ public class OrderItem {
         if (unitPrice == null || quantity == null) {
             throw new IllegalStateException("unitPrice and quantity must be set before computing lineTotal");
         }
+
         lineTotal = unitPrice
                 .multiply(BigDecimal.valueOf(quantity))
                 .setScale(2, java.math.RoundingMode.HALF_UP);

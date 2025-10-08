@@ -74,13 +74,8 @@ public class OrderMapper {
     }
 
     public static Order fromCreateDto(createOrderDto dto) {
-        if (dto == null) {
-            return null;
-        }
+        if (dto == null) {return null;}
 
-        Order order = new Order();
-        order.setCurrency(dto.getCurrency());
-        order.setStatus(OrderStatus.CREATED);
-        return order;
+        return new Order();
     }
 }

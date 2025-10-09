@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.api;
 
+import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.UnexpectedTypeException;
@@ -34,6 +35,7 @@ public class GlobalExceptionHandler {
     private static final URI TYPE_UNEXPECTED      = URI.create("urn:problem:unexpected");
     private static final URI TYPE_UNSUPPORTED_MEDIA = URI.create("urn:problem:unsupported-media-type");
     private static final URI TYPE_NOT_ACCEPTABLE    = URI.create("urn:problem:not-acceptable");
+    private static final URI TYPE_INSUFFICIENT_STOCK = URI.create("urn:problem:insufficient-stock");
 
 
     @ExceptionHandler(NoSuchElementException.class)
@@ -118,6 +120,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
     public ProblemDetail handleNotAcceptable(HttpMediaTypeNotAcceptableException ex, HttpServletRequest req) {
         return pd(HttpStatus.NOT_ACCEPTABLE, "Not Acceptable", ex.getMessage(), TYPE_NOT_ACCEPTABLE, req);
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ProblemDetail handleInsufficientStock(InsufficientStockException ex, HttpServletRequest req) {
+        return pd(HttpStatus.UNPROCESSABLE_ENTITY, "Insufficient Stock", ex.getMessage(), TYPE_INSUFFICIENT_STOCK, req);
     }
 
     @ExceptionHandler(Exception.class)

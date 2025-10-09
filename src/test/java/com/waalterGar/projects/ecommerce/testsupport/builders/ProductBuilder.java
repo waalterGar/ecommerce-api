@@ -11,17 +11,22 @@ public class ProductBuilder {
     private BigDecimal price = new BigDecimal("19.99");
     private Currency currency = Currency.EUR;
     private boolean isActive = true;
+    private int stockQuantity = 0;
 
     public ProductBuilder withSku(String s) { this.sku = s; return this; }
     public ProductBuilder withName(String n) { this.name = n; return this; }
     public ProductBuilder withPrice(String p) { this.price = new BigDecimal(p); return this; }
     public ProductBuilder withCurrency(Currency c) { this.currency = c; return this; }
+    public ProductBuilder withStockQuantity(int quantity) { this.stockQuantity = quantity; return this; }
     public ProductBuilder inactive() { this.isActive = false; return this; }
 
     public Product build() {
         Product p = new Product();
-        p.setSku(sku); p.setName(name); p.setPrice(price);
-        p.setCurrency(currency); p.setIsActive(isActive);
+        p.setSku(sku); p.setName(name);
+        p.setPrice(price);
+        p.setCurrency(currency);
+        p.setIsActive(isActive);
+        p.setStockQuantity(stockQuantity);
         return p;
     }
 }

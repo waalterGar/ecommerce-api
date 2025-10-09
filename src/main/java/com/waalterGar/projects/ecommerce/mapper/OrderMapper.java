@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 
 public class OrderMapper {
     public static OrderDto toDto(Order order) {
-        System.out.println("Mapping Order to OrderDto: " + order);
         if (order == null) {
             return null;
         }
@@ -74,13 +73,8 @@ public class OrderMapper {
     }
 
     public static Order fromCreateDto(createOrderDto dto) {
-        if (dto == null) {
-            return null;
-        }
+        if (dto == null) {return null;}
 
-        Order order = new Order();
-        order.setCurrency(dto.getCurrency());
-        order.setStatus(OrderStatus.CREATED);
-        return order;
+        return new Order();
     }
 }

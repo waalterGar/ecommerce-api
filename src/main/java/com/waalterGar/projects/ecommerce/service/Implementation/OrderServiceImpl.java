@@ -85,10 +85,8 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderDto getOrderByExternalId(String externalId) {
-        System.out.println("Fetching order with externalId: " + externalId);
         Order order = orderRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
-        System.out.println("Found order with externalId: " + order.getExternalId()+" , customer: "+ order.getCustomer().getFirstName()+  ", totalAmount: " + order.getTotalAmount()+ ", items count: " + order.getItems().size());
         return OrderMapper.toDto(order);
     }
 

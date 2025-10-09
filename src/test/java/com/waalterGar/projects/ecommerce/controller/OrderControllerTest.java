@@ -32,8 +32,10 @@ class OrderControllerTest {
     private static final String UNKNOWN_URL = BASE_URL + "/" + UNKNOWN_ORDER_ID;
     private static final String ORDER_URL = BASE_URL + "/" + ORDER_ID;
 
-    @Autowired MockMvc mvc;
-    @MockitoBean OrderService orderService;
+    @Autowired
+    MockMvc mvc;
+    @MockitoBean
+    OrderService orderService;
 
     @Test
     void getByExternalId_found_returns200() throws Exception {
@@ -94,10 +96,12 @@ class OrderControllerTest {
     }
 
 
-   @Test
+    @Test
     void createOrder_invalidPayload_returns400_problem() throws Exception {
-       doAnswer(inv -> { throw new AssertionError("Service should not be called for invalid payload"); })
-               .when(orderService).createOrder(any());
+        doAnswer(inv -> {
+            throw new AssertionError("Service should not be called for invalid payload");
+        })
+                .when(orderService).createOrder(any());
 
         mvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,11 +119,11 @@ class OrderControllerTest {
     void createOrder_unexpectedTypeException_returns400_problem() throws Exception {
         // Arrange: valid payload so it doesn't fail earlier
         String validPayload = """
-      {
-        "customerExternalId": "cust-123",
-        "currency": "USD",
-        "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
-      }""";
+                {
+                  "customerExternalId": "cust-123",
+                  "currency": "USD",
+                  "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
+                }""";
 
         when(orderService.createOrder(any()))
                 .thenThrow(new UnexpectedTypeException("HV000030: No validator for ..."));
@@ -168,11 +172,11 @@ class OrderControllerTest {
     @Test
     void createOrder_valid_returns201_withBody() throws Exception {
         String payload = """
-      {
-        "customerExternalId": "cust-123",
-        "currency": "EUR",
-        "items": [ { "productSku": "SKU-1", "quantity": 2 } ]
-      }""";
+                {
+                  "customerExternalId": "cust-123",
+                  "currency": "EUR",
+                  "items": [ { "productSku": "SKU-1", "quantity": 2 } ]
+                }""";
 
         OrderDto returned = new OrderDto();
         returned.setExternalId("ord-xyz");
@@ -211,12 +215,12 @@ class OrderControllerTest {
     @Test
     void createOrder_notAcceptable_returns406_problem() throws Exception {
         String payload = """
-      {
-        "customerExternalId": "cust-123",
-        "currency": "EUR",
-        "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
-      }
-    """;
+                  {
+                    "customerExternalId": "cust-123",
+                    "currency": "EUR",
+                    "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
+                  }
+                """;
 
         OrderDto dto = new OrderDto();
         dto.setExternalId("ord-abc");
@@ -224,11 +228,36 @@ class OrderControllerTest {
 
         mvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.TEXT_PLAIN) // client only accepts text/plain
+                        .accept(MediaType.TEXT_PLAIN)
                         .content(payload))
                 .andExpect(status().isNotAcceptable())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("urn:problem:not-acceptable"))
                 .andExpect(jsonPath("$.title").value("Not Acceptable"));
+    }
+
+    @Test
+    void createOrder_insufficientStock_returns422_problem() throws Exception {
+        String payload = """
+                {
+                  "customerExternalId": "cust-123",
+                   "currency": "EUR",
+                  "items": [ { "productSku": "SKU-1", "quantity": 999 } ]
+                }
+                """;
+        when(orderService.createOrder(any()))
+                .thenThrow(new com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException(
+                        "Insufficient stock for SKU SKU-1"));
+
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_PLAIN)
+                        .content(payload))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:insufficient-stock"))
+                .andExpect(jsonPath("$.title").value("Insufficient Stock"))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(handler().handlerType(OrderController.class))
+                .andExpect(handler().methodName("createOrder"));
     }
 }

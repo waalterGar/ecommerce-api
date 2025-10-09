@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 
 public class OrderMapper {
     public static OrderDto toDto(Order order) {
-        System.out.println("Mapping Order to OrderDto: " + order);
         if (order == null) {
             return null;
         }

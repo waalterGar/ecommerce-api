@@ -4,6 +4,7 @@ import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockExce
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.UnexpectedTypeException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -130,6 +131,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex, HttpServletRequest req) {
         return pd(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "Unexpected error.", TYPE_UNEXPECTED, req);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex, HttpServletRequest req) {
+        return pd(HttpStatus.CONFLICT, "Optimistic Lock Conflict", "Concurrent update conflict. Please retry.", URI.create("urn:problem:conflict"), req);
     }
 
     /** Build a ProblemDetail and enrich with common properties. */

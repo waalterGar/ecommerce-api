@@ -32,6 +32,7 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
 
+    @Transactional
     @Override
     public OrderDto createOrder(createOrderDto orderDto) {
         Customer customer = customerRepository.findByExternalId(orderDto.getCustomerExternalId())
@@ -66,6 +67,8 @@ public class OrderServiceImpl implements OrderService {
             } else if (product.getCurrency() != orderCurrency) {
                 throw new IllegalArgumentException("Currency mismatch for SKU " + product.getSku());
             }
+
+            product.setStockQuantity(availableStock - requestedQuantity);
 
             OrderItem item = new OrderItem();
             item.setProductSku(product.getSku());

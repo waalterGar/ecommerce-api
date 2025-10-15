@@ -52,6 +52,9 @@ public class Product {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Version
+    private Integer version;
+
     @PrePersist
     public void prePersist() {
         createdAt = LocalDateTime.now();

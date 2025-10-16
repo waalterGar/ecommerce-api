@@ -260,4 +260,30 @@ class OrderControllerTest {
                 .andExpect(handler().handlerType(OrderController.class))
                 .andExpect(handler().methodName("createOrder"));
     }
+
+    @Test
+    void createOrder_optimisticLockConflict_returns409_problem() throws Exception {
+        String payload = """
+    {
+      "customerExternalId": "cust-123",
+      "currency": "EUR",
+      "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
+    }""";
+
+        when(orderService.createOrder(any()))
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Concurrent update conflict"));
+
+        mvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:conflict"))
+                .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
+                .andExpect(handler().handlerType(OrderController.class))
+                .andExpect(handler().methodName("createOrder"));
+
+        verify(orderService).createOrder(any());
+        verifyNoMoreInteractions(orderService);
+    }
 }

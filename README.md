@@ -1,8 +1,9 @@
 # Ecommerce API 🛒
 
-> **Novedades de `test/jpa-with-testcontainers`**: tests de persistencia con **MySQL Testcontainers**; ITs del repositorio de Orders (**distinct roots**, **orphanRemoval**, **cascade persist**); builders de test ajustados (listas **mutables** + back-refs vía `Order.addItem/removeItem`); smoke `@SpringBootTest` configurado para usar el contenedor.
->
-> **Novedades de `feat/validation`**: validación mínima en DTOs de Orders (`@Valid`, `@NotBlank`, `@NotEmpty`, `@Positive`, `@NotNull`) y habilitado el test **POST inválido → 400**; además, se mapea `UnexpectedTypeException` a **400** como guardarraíl de validación.
+
+> **Novedades de `test/jpa-with-testcontainers`**: tests de persistencia con **MySQL Testcontainers**; ITs del repositorio de Orders (distinct roots, orphanRemoval, cascade persist); builders de test ajustados (listas mutables + back-refs vía `Order.addItem/removeItem`); smoke `@SpringBootTest` configurado para usar el contenedor.  
+> **Novedades de `feat/validation`**: validación mínima en DTOs de Orders (`@Valid`, `@NotBlank`, `@NotEmpty`, `@Positive`, `@NotNull`) y test **POST inválido → 400**; además, `UnexpectedTypeException` mapeada a **400** como guardarraíl.  
+> **Novedades de `feat/orders-transactional-stock`**: creación de pedidos **transaccional** con **decremento de stock**; reglas reforzadas (pricing/moneda autoritativos desde `Product`, totales en servidor, estado inicial `CREATED`). Concurrencia con `@Version` en `Product` (optimistic locking) → **409 Conflict**; **422** para stock insuficiente. ITs de servicio con Testcontainers verifican decremento, rollback y caso límite (= stock).
 
 ---
 
@@ -70,6 +71,7 @@ Notas:
 - La documentación se genera automáticamente a partir de los **controladores** y **DTOs**.
 - Los **errores** siguen **RFC 7807** (`application/problem+json`) mediante el **handler global**.
 
+> Próxima fase: centralizar documentación de respuestas (201/400/409/422) sin añadir ruido a los controladores.
 ---
 
 ## 📚 Endpoints actuales
@@ -119,8 +121,17 @@ Notas:
 ### 🧾 Orders
 > Requisitos: el `customerExternalId` y los `productSku` deben existir previamente.
 
-- **POST** `/api/orders` → Crear un pedido  
-  **Body ejemplo:**
+- **POST** `/api/orders` → Crear un pedido
+
+  **Comportamiento (v2 - transaccional)**
+  - Valida el payload y aplica reglas de negocio.
+  - **Puerta de stock**: si `quantity` > `stockQuantity` → **422** (ProblemDetail).
+  - **Decrementa stock** y **persiste el pedido** en la **misma transacción**.
+  - Cualquier error → **rollback** (ni pedido ni decremento).
+  - **Precios/moneda autoritativos**: `unitPrice`/`currency` del item vienen de `Product` (se ignora el precio del cliente).
+  - **Moneda del pedido**: la del **primer producto**; mezclas de moneda → **400**.
+  
+**Body ejemplo:**
   ```json
   {
     "customerExternalId": "a1f4e12c-8d5c-4c1b-b3e1-7e2c1d123456",
@@ -150,6 +161,12 @@ Se aplica Bean Validation en el payload:
 - `currency`: **@NotNull** (enum soportado: `EUR`)
 
 Si la validación falla, se devuelve **400** con `application/problem+json` y un mapa `errors` por campo.
+
+**Códigos de respuesta (RFC 7807 para errores)**
+- `201` — Creado (devuelve `OrderDto`).
+- `400` — Petición inválida (validación o **mezcla de monedas**).
+- `409` — **Optimistic lock conflict** (concurrencia; `@Version` en `Product`).
+- `422` — **Insufficient stock** (violación de regla de negocio).
 
 ---
 
@@ -199,6 +216,9 @@ Todas las respuestas de error incluyen: `type`, `title`, `status`, `detail`, `pa
   ```
 - **415** `urn:problem:unsupported-media-type` — `Content-Type` no soportado.
 - **406** `urn:problem:not-acceptable` — `Accept` no negociable.
+- **409** `urn:problem:conflict` — conflicto de actualización concurrente (optimistic locking).
+- **422** `urn:problem:insufficient-stock` — cantidad solicitada excede el stock disponible.
+
 
 > **Nota**: si se configura mal una constraint (p. ej., `@NotBlank` en un enum), el sistema devuelve **400** con `type: urn:problem:validation` gracias al handler de `UnexpectedTypeException`.
 
@@ -241,15 +261,27 @@ El proyecto incluye tests unitarios (JUnit 5 + Mockito), slice web y **tests de 
   - **Orphan removal**: eliminar un item del agregado lo borra en DB (`orphanRemoval = true`).
   - **Cascade persist**: guardar sólo el `Order` persiste también sus `OrderItem`s; se validan IDs y back-refs.
 
+- **`OrderServiceIT`** (SpringBoot + **MySQL Testcontainers**)
+  - **Decremento de stock** en éxito (p. ej., 10 → 7).
+  - **Rollback** en fallo por stock insuficiente (no hay pedido; stock intacto).
+  - **Caso límite**: `requested == stock` ⇒ éxito; stock a 0.
+
+
 ### Ejecutar tests
 - **Sólo el slice web (no requiere BD):**
   ```bash
   ./mvnw -Dtest=*ControllerTest test
   ```
+  
 - **Sólo los IT de repositorio (arranca Testcontainers automáticamente):**
   ```bash
   ./mvnw -Dtest='*OrderRepositoryIT' test
   ```
+- **Ejecutar solo ITs de servicio**
+  ```bash
+  ./mvnw -Dtest="**/service/*ServiceIT.java" test
+  ```
+  
 - **Suite completa**:
   ```bash
   ./mvnw test

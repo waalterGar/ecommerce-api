@@ -13,6 +13,7 @@ import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
 import com.waalterGar.projects.ecommerce.repository.OrderRepository;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
 import com.waalterGar.projects.ecommerce.service.OrderService;
+import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException;
 import com.waalterGar.projects.ecommerce.utils.Currency;
 import com.waalterGar.projects.ecommerce.utils.OrderStatus;
@@ -51,6 +52,10 @@ public class OrderServiceImpl implements OrderService {
         for (createOrderItemDto itm : orderDto.getItems()) {
             Product product = productRepository.findBySku(itm.getProductSku())
                     .orElseThrow(() -> new NoSuchElementException("Product not found: " + itm.getProductSku()));
+
+            if (Boolean.FALSE.equals(product.getIsActive())) {
+                throw new InactiveProductException("Product is inactive: " + product.getSku());
+            }
 
             int requestedQuantity = itm.getQuantity();
             int availableStock = product.getStockQuantity();

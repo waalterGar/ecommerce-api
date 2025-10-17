@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.api;
 
+import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -136,6 +137,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex, HttpServletRequest req) {
         return pd(HttpStatus.CONFLICT, "Optimistic Lock Conflict", "Concurrent update conflict. Please retry.", URI.create("urn:problem:conflict"), req);
+    }
+
+    @ExceptionHandler(InactiveProductException.class)
+    public ProblemDetail handleInactiveProduct(InactiveProductException ex, HttpServletRequest req) {
+        return pd(HttpStatus.UNPROCESSABLE_ENTITY,"Inactive Product", ex.getMessage(), URI.create("urn:problem:inactive-product"), req);
     }
 
     /** Build a ProblemDetail and enrich with common properties. */

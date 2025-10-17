@@ -1,10 +1,7 @@
 # Ecommerce API 🛒
 
-
-> **Novedades de `test/jpa-with-testcontainers`**: tests de persistencia con **MySQL Testcontainers**; ITs del repositorio de Orders (distinct roots, orphanRemoval, cascade persist); builders de test ajustados (listas mutables + back-refs vía `Order.addItem/removeItem`); smoke `@SpringBootTest` configurado para usar el contenedor.  
-> **Novedades de `feat/validation`**: validación mínima en DTOs de Orders (`@Valid`, `@NotBlank`, `@NotEmpty`, `@Positive`, `@NotNull`) y test **POST inválido → 400**; además, `UnexpectedTypeException` mapeada a **400** como guardarraíl.  
-> **Novedades de `feat/orders-transactional-stock`**: creación de pedidos **transaccional** con **decremento de stock**; reglas reforzadas (pricing/moneda autoritativos desde `Product`, totales en servidor, estado inicial `CREATED`). Concurrencia con `@Version` en `Product` (optimistic locking) → **409 Conflict**; **422** para stock insuficiente. ITs de servicio con Testcontainers verifican decremento, rollback y caso límite (= stock).
-
+> **Novedades de `feat/orders-transactional-stock`**: creación de pedidos **transaccional** con **decremento de stock**; reglas reforzadas (pricing/moneda autoritativos desde `Product`, totales en servidor, estado inicial `CREATED`). Concurrencia con `@Version` en `Product` (optimistic locking) → **409 Conflict**; **422** para stock insuficiente.  
+> **Novedades de `feat/product-maintenance`**: actualización de productos vía **PUT `/products/{sku}`** (normaliza `price` a escala 2, `name` con `trim`, `sku/currency` inmutables); activación/desactivación con **PATCH `/products/{sku}/activation`**; los pedidos ahora devuelven **422** si algún `productSku` está **inactivo** (`urn:problem:inactive-product`).
 ---
 
 ## 📋 Descripción
@@ -23,12 +20,11 @@ Este proyecto sirve como base para demostrar mis habilidades en backend, aplican
 - **Docker Compose**
 - **Maven**
 - **Testcontainers** (tests de persistencia con MySQL real en contenedor)
-
 ---
 
 ## ⚙️ Configuración y ejecución
 
-> `server.servlet.context-path=/api` → todos los endpoints viven bajo `/api`.
+> `server.servlet.context-path=/api` → todos los endpoints bajo `/api`.
 
 ### 1. Variables de entorno
 Crea un archivo `.env` en la raíz del proyecto con las siguientes variables (⚠️ el archivo está en `.gitignore` y no se versiona):
@@ -73,25 +69,58 @@ Notas:
 
 > Próxima fase: centralizar documentación de respuestas (201/400/409/422) sin añadir ruido a los controladores.
 ---
-
 ## 📚 Endpoints actuales
 > **Prefijo de API**: todos los endpoints están bajo el prefijo **`/api`**.
 
 ### 🛍️ Products
-- **POST** `/api/products` → Crear un producto  
-  **Body ejemplo:**
+
+- **POST** `/api/products` → Crear un producto 
+
+
+  Body ejemplo:
   ```json
   {
-    "sku": "TSHIRT-BASIC-001",
-    "name": "Camiseta Básica Blanca",
-    "description": "Camiseta unisex de algodón 100% en color blanco.",
-    "price": 19.99,
-    "currency": "EUR",
-    "stockQuantity": 150
+  "sku": "TSHIRT-BASIC-001",
+  "name": "Camiseta Básica Blanca",
+  "description": "Camiseta unisex de algodón 100% en color blanco.",
+  "price": 19.99,
+  "currency": "EUR",
+  "stockQuantity": 150
   }
   ```
+
 - **GET** `/api/products` → Listar todos los productos
+
 - **GET** `/api/products/{sku}` → Obtener un producto por SKU
+
+- **PUT** `/api/products/{sku}` → Actualizar un producto (campos mutables)
+  - Campos permitidos: `name`, `description`, `price`, `stockQuantity`, `isActive`
+  - **Inmutables:** `sku`, `currency`
+  - **Códigos:** `200` OK · `400` Validación · `404` No existe · `409` Conflicto (optimistic lock)
+    
+  
+Body ejemplo:
+  ```json
+    {
+    "name": "Camiseta Básica Blanca (v2)",
+    "description": "Camiseta unisex 100% algodón. Nueva descripción.",
+    "price": 21.49,
+    "stockQuantity": 180,
+    "isActive": true
+    }
+  ```
+
+- **PATCH** `/api/products/{sku}/activation` → Activar/Desactivar un producto
+  - Body: `{ "isActive": true | false }`
+  - **Códigos:** `200` OK · `400` Validación · `404` No existe · `409` Conflicto
+  
+
+  Body ejemplo:
+  ```json
+    { "isActive": false }
+  ```
+
+> Detalles técnicos: `price` se normaliza a 2 decimales (HALF_UP). Concurrencia protegida por `@Version` en `Product`.
 
 ---
 
@@ -114,8 +143,8 @@ Notas:
   }
   ```
 - **GET** `/api/customers` → Listar todos los customers
-- **GET** `/api/customers/{externalId}` → Obtener un customer por su `externalId`
 
+- **GET** `/api/customers/{externalId}` → Obtener un customer por su `externalId`
 ---
 
 ### 🧾 Orders
@@ -123,36 +152,52 @@ Notas:
 
 - **POST** `/api/orders` → Crear un pedido
 
-  **Comportamiento (v2 - transaccional)**
+  Comportamiento (v2 - transaccional)
   - Valida el payload y aplica reglas de negocio.
   - **Puerta de stock**: si `quantity` > `stockQuantity` → **422** (ProblemDetail).
   - **Decrementa stock** y **persiste el pedido** en la **misma transacción**.
   - Cualquier error → **rollback** (ni pedido ni decremento).
   - **Precios/moneda autoritativos**: `unitPrice`/`currency` del item vienen de `Product` (se ignora el precio del cliente).
   - **Moneda del pedido**: la del **primer producto**; mezclas de moneda → **400**.
-  
-**Body ejemplo:**
-  ```json
+
+  Body ejemplo:
+ ```json
   {
     "customerExternalId": "a1f4e12c-8d5c-4c1b-b3e1-7e2c1d123456",
     "currency": "EUR",
-    "items": [
+    "items": 
+    [
       { "productSku": "TSHIRT-BASIC-002", "quantity": 2 }
     ]
   }
-  ```
-  **Respuesta (201 Created)**
-  ```json
-  { "externalId": "ord-xyz" }
-  ```
+```
+
+  Respuesta (201 Created)
+ ```json
+    { "externalId": "ord-xyz" } 
+```
+
+  **Reglas de negocio (añadido en esta fase):**
+  - Si algún `productSku` del pedido está **inactivo** (`isActive = false`), el pedido se **rechaza** con **422**.
+
+  **Respuesta de error 422 (producto inactivo)**
+ ```json
+  {
+  "type": "urn:problem:inactive-product",
+  "title": "Inactive Product",
+  "status": 422,
+  "detail": "Product is inactive: MUG-LOGO-001",
+  "path": "/api/orders",
+  "timestamp": "2025-10-17T10:00:00Z"
+  }
+```
 
 - **GET** `/api/orders/{externalId}` → Obtener un pedido por su `externalId`  
-  **Nota**: si no existe, lanza `NoSuchElementException("Order not found")`, que se mapea a **HTTP 404** mediante el handler global.
+  Nota: si no existe, lanza `NoSuchElementException("Order not found")`, que se mapea a **HTTP 404** mediante el handler global.
 
 - **GET** `/api/orders` → Listar todos los pedidos (con items y customer precargados)
 
-**Validación de entrada (createOrder)**  
-Se aplica Bean Validation en el payload:
+Validación de entrada (createOrder)
 - `customerExternalId`: **@NotBlank**
 - `items`: **@NotEmpty**
   - cada item:
@@ -162,11 +207,11 @@ Se aplica Bean Validation en el payload:
 
 Si la validación falla, se devuelve **400** con `application/problem+json` y un mapa `errors` por campo.
 
-**Códigos de respuesta (RFC 7807 para errores)**
-- `201` — Creado (devuelve `OrderDto`).
+Códigos de respuesta (RFC 7807 para errores)
+- `201` — Creado.
 - `400` — Petición inválida (validación o **mezcla de monedas**).
 - `409` — **Optimistic lock conflict** (concurrencia; `@Version` en `Product`).
-- `422` — **Insufficient stock** (violación de regla de negocio).
+- `422` — **Insufficient stock** / **Producto inactivo** (violación de regla de negocio).
 
 ---
 
@@ -178,122 +223,82 @@ Todas las respuestas de error incluyen: `type`, `title`, `status`, `detail`, `pa
 - **400** `urn:problem:malformed-json` — cuerpo JSON mal formado.
 - **404** `urn:problem:no-resource` — ruta no mapeada/recurso no encontrado.
 - **404** `urn:problem:not-found` — recurso inexistente (p. ej. `NoSuchElementException`).
-  ```json
-  {
-    "type": "urn:problem:not-found",
-    "title": "Resource Not Found",
-    "status": 404,
-    "detail": "Order not found",
-    "path": "/api/orders/ord-does-not-exist",
-    "timestamp": "2025-10-01T18:00:00Z"
-  }
-  ```
 - **400** `urn:problem:invalid-request` — petición inválida (p. ej. `IllegalArgumentException`).
-  ```json
-  {
-    "type": "urn:problem:invalid-request",
-    "title": "Invalid Request",
-    "status": 400,
-    "detail": "Invalid externalId",
-    "path": "/api/orders/bad",
-    "timestamp": "2025-10-01T18:00:00Z"
-  }
-  ```
 - **400** `urn:problem:validation` — errores de validación en el cuerpo.
-  ```json
-  {
-    "type": "urn:problem:validation",
-    "title": "Validation Failed",
-    "status": 400,
-    "detail": "One or more fields are invalid.",
-    "path": "/api/orders",
-    "timestamp": "2025-10-02T18:00:00Z",
-    "errors": {
-      "customerExternalId": "customerExternalId is required",
-      "items": "items must not be empty"
-    }
-  }
-  ```
 - **415** `urn:problem:unsupported-media-type` — `Content-Type` no soportado.
 - **406** `urn:problem:not-acceptable` — `Accept` no negociable.
 - **409** `urn:problem:conflict` — conflicto de actualización concurrente (optimistic locking).
 - **422** `urn:problem:insufficient-stock` — cantidad solicitada excede el stock disponible.
+- **422** `urn:problem:inactive-product` — el pedido incluye un `productSku` con `isActive = false`.
 
 
 > **Nota**: si se configura mal una constraint (p. ej., `@NotBlank` en un enum), el sistema devuelve **400** con `type: urn:problem:validation` gracias al handler de `UnexpectedTypeException`.
 
 ---
-
 ## 🧪 Tests
 
 El proyecto incluye tests unitarios (JUnit 5 + Mockito), slice web y **tests de integración JPA con Testcontainers**.
 
-- **`ProductServiceImpl`**
-  - `createProduct`: guarda y mapea correctamente.
-  - `getProductBySku`: recupera por SKU (existe / no existe).
-  - `getAllProducts`: lista vacía si no hay productos.
+- **ProductServiceImpl**
+  - createProduct: guarda y mapea correctamente.
+  - getProductBySku: recupera por SKU (existe / no existe).
+  - getAllProducts: lista vacía si no hay productos.
+  - updateProduct: recorta `name`, normaliza `price` (escala 2), conserva `sku/currency`.
+  - setProductActive (DTO): happy / notFound / blankSku / nullBody.
 
-- **`CustomerServiceImpl`**
-  - `createCustomer`: guarda y mapea correctamente.
-  - `getCustomerByExternalId`: recupera por `externalId` (existe / no existe).
-  - `getAllCustomers`: lista vacía.
+- **ProductController** (`@WebMvcTest` + handler global)
+  - PUT `/api/products/{sku}` → 200/400/404/409/malformed/415.
+  - PATCH `/api/products/{sku}/activation` → 200/400/404/409.
 
-- **`OrderServiceImpl`** (Mockito, sin contexto Spring)
-  - `getOrderByExternalId`: encontrado → DTO con items y totales.
-  - `getOrderByExternalId`: no encontrado → `NoSuchElementException`.
-  - `getAllOrders`: lista vacía / con datos (valida `externalId` y `totalAmount`).
-  - `createOrder`: happy-path → devuelve DTO con items y `totalAmount`.
-  - `createOrder`: customer no existe → lanza y **no** guarda.
-  - `createOrder`: product no existe → lanza y **no** guarda.
+- **OrderServiceImpl** (Mockito)
+  - getOrderByExternalId: encontrado / no encontrado.
+  - getAllOrders: vacío / con datos.
+  - createOrder: happy → totales; customer/product missing → no guarda.
+  - createOrder: stock insuficiente → **422**; mezclas de moneda → **400**.
+  - createOrder: producto inactivo → **422** (no guarda).
 
-- **`OrderController`** (slice web, `@WebMvcTest` + handler global)
-  - `GET /api/orders/{id}` → **200** y JSON de pedido.
-  - `GET /api/orders/{id}` (no existe) → **404** problem.
-  - `GET /api/orders/{id}` (input inválido) → **400** problem.
-  - `POST /api/orders` **válido** → **201** JSON con `externalId`.
-  - `POST /api/orders` **mal JSON** → **400** problem.
-  - `POST /api/orders` **Content-Type no soportado** → **415** problem.
-  - `POST /api/orders` **Accept no negociable** → **406** problem.
-  - Ruta desconocida → **404** problem.
+- **OrderController** (slice web)
+  - GET `/api/orders/{id}` → 200 / 404 / 400.
+  - POST `/api/orders` → 201 / 400 / 406 / 415 / **422 (inactive/stock)**.
 
-- **`OrderRepositoryIT`** (JPA + **MySQL Testcontainers**)
-  - **Distinct roots**: `findAllWithItemsAndCustomer` devuelve órdenes **sin duplicar** y con conteo correcto de items.
-  - **Orphan removal**: eliminar un item del agregado lo borra en DB (`orphanRemoval = true`).
-  - **Cascade persist**: guardar sólo el `Order` persiste también sus `OrderItem`s; se validan IDs y back-refs.
+- **OrderRepositoryIT** (JPA + **MySQL Testcontainers**)
+  - Distinct roots, orphanRemoval, cascade persist.
 
-- **`OrderServiceIT`** (SpringBoot + **MySQL Testcontainers**)
-  - **Decremento de stock** en éxito (p. ej., 10 → 7).
-  - **Rollback** en fallo por stock insuficiente (no hay pedido; stock intacto).
-  - **Caso límite**: `requested == stock` ⇒ éxito; stock a 0.
-
+- **OrderServiceIT** (SpringBoot + **MySQL Testcontainers**)
+  - Decremento de stock (éxito), rollback (fallo), caso límite (= stock).
 
 ### Ejecutar tests
-- **Sólo el slice web (no requiere BD):**
+- Sólo slice web:
+
   ```bash
   ./mvnw -Dtest=*ControllerTest test
   ```
-  
-- **Sólo los IT de repositorio (arranca Testcontainers automáticamente):**
+
+- Sólo ITs de repositorio:
   ```bash
   ./mvnw -Dtest='*OrderRepositoryIT' test
   ```
-- **Ejecutar solo ITs de servicio**
+
+- Ejecutar solo ITs de servicio:
   ```bash
   ./mvnw -Dtest="**/service/*ServiceIT.java" test
   ```
-  
-- **Suite completa**:
+
+- Suite completa:
   ```bash
   ./mvnw test
   ```
 
 > Testcontainers descarga imágenes la primera vez; posteriores ejecuciones son más rápidas.
 
----
 
+---
 ## 📈 Próximos pasos
-- Reglas de negocio (v1): stock mínimo, decremento de stock, totales “autoritativos”, estado inicial `NEW`, transaccionalidad, 422 (insufficient stock) con ProblemDetail.
-- Añadir más endpoints (categorías, etc.).
+
+- Ordenes (v1): pagos y cancelación (restock en cancelar).
+- Flyway: baseline y migraciones (precio DECIMAL(12,2), `version` NOT NULL DEFAULT 0).
 - Seguridad con Spring Security + JWT.
+- Paginación y filtros en listados (Products/Orders/Customers).
+- Observabilidad (structured logging, métricas, tracing).
 - Validaciones adicionales y manejo avanzado de errores.
-- Ampliar la cobertura de tests end-to-end.
+- Ampliar cobertura de tests end-to-end.

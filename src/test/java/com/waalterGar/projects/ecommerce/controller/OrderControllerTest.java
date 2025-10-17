@@ -3,6 +3,7 @@ package com.waalterGar.projects.ecommerce.controller;
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
 import com.waalterGar.projects.ecommerce.service.OrderService;
+import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import jakarta.validation.UnexpectedTypeException;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -282,6 +283,31 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.title").value("Optimistic Lock Conflict"))
                 .andExpect(handler().handlerType(OrderController.class))
                 .andExpect(handler().methodName("createOrder"));
+
+        verify(orderService).createOrder(any());
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void createOrder_inactiveProduct_returns422_problem() throws Exception {
+        String payload = """
+    {
+      "customerExternalId": "cust-123",
+      "currency": "EUR",
+      "items": [ { "productSku": "SKU-1", "quantity": 1 } ]
+    }""";
+
+        when(orderService.createOrder(any()))
+                .thenThrow(new InactiveProductException("Product is inactive: SKU-1"));
+
+        mvc.perform(post("/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:inactive-product"))
+                .andExpect(jsonPath("$.title").value("Inactive Product"))
+                .andExpect(jsonPath("$.detail").value("Product is inactive: SKU-1"));
 
         verify(orderService).createOrder(any());
         verifyNoMoreInteractions(orderService);

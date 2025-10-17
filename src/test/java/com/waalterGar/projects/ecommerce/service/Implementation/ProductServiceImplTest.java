@@ -1,5 +1,7 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
+import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
+import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.entity.Product;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -108,6 +111,141 @@ class ProductServiceImplTest {
         verify(productRepository).findAll();
     }
 
+    @Test
+    @DisplayName("updateProduct: updates managed entity, trims name, scales price(2), returns ProductDto")
+    void updateProduct_withValidDto_updatesEntityAndReturnsDto() {
+        // Given
+        Product existing = createDefaultProductEntity();
+        when(productRepository.findBySku(eq(DEFAULT_SKU))).thenReturn(Optional.of(existing));
+
+        UpdateProductDto dto = new UpdateProductDto(
+                "  New Name  ",                 // will be trimmed
+                "Updated description",
+                new BigDecimal("10.995"),       // will be scaled to 11.00 (HALF_UP)
+                25,
+                false
+        );
+
+        // When
+        ProductDto out = productService.updateProduct(DEFAULT_SKU, dto);
+
+        // Then (returned DTO reflects updates)
+        assertThat(out).isNotNull();
+        assertThat(out.getSku()).isEqualTo(DEFAULT_SKU);      // identity unchanged
+        assertThat(out.getName()).isEqualTo("New Name");      // trimmed
+        assertThat(out.getDescription()).isEqualTo("Updated description");
+        assertThat(out.getPrice()).isEqualByComparingTo(new BigDecimal("11.00")); // scaled(2)
+        assertThat(out.getStockQuantity()).isEqualTo(25);
+        assertThat(out.getIsActive()).isFalse();
+
+        // And (managed entity was mutated inside the transaction)
+        assertThat(existing.getName()).isEqualTo("New Name");
+        assertThat(existing.getPrice()).isEqualByComparingTo("11.00");
+        assertThat(existing.getStockQuantity()).isEqualTo(25);
+        assertThat(existing.getIsActive()).isFalse();
+
+        verify(productRepository).findBySku(eq(DEFAULT_SKU));
+        verifyNoMoreInteractions(productRepository); // relying on JPA dirty checking (no save)
+    }
+
+    @Test
+    @DisplayName("updateProduct: throws NoSuchElementException when SKU does not exist")
+    void updateProduct_withNonExistentSku_throwsNoSuchElementException() {
+        // Given
+        String missing = "MISSING-SKU";
+        when(productRepository.findBySku(eq(missing))).thenReturn(Optional.empty());
+
+        UpdateProductDto dto = new UpdateProductDto(
+                "Name", "Desc", new BigDecimal("1.00"), 1, true
+        );
+
+        // When / Then
+        assertThatThrownBy(() -> productService.updateProduct(missing, dto))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Product not found");
+        verify(productRepository).findBySku(eq(missing));
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("updateProduct: throws IllegalArgumentException when SKU is blank")
+    void updateProduct_withBlankSku_throwsIllegalArgumentException() {
+        UpdateProductDto dto = new UpdateProductDto(
+                "Name", "Desc", new BigDecimal("1.00"), 1, true
+        );
+
+        assertThatThrownBy(() -> productService.updateProduct("   ", dto))
+                .isInstanceOf(IllegalArgumentException.class);
+        // repo should not be called
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: flips flag on managed entity and returns updated DTO")
+    void setProductActive_happyPath_updatesEntityAndReturnsDto() {
+        // Given
+        Product existing = createDefaultProductEntity();
+        existing.setIsActive(false); // initial state
+        when(productRepository.findBySku(eq(DEFAULT_SKU))).thenReturn(Optional.of(existing));
+
+        ActivationProductDto dto = new ActivationProductDto(true);
+
+        // When
+        ProductDto out = productService.setProductActive(DEFAULT_SKU, dto);
+
+        // Then (DTO reflects new state)
+        assertThat(out).isNotNull();
+        assertThat(out.getSku()).isEqualTo(DEFAULT_SKU);
+        assertThat(out.getIsActive()).isTrue();
+
+        // And (entity actually mutated; dirty checking will persist in real tx)
+        assertThat(existing.getIsActive()).isTrue();
+
+        verify(productRepository).findBySku(eq(DEFAULT_SKU));
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: throws NoSuchElementException when SKU does not exist")
+    void setProductActive_notFound_throwsNoSuchElementException() {
+        String missing = "MISSING-SKU";
+        when(productRepository.findBySku(eq(missing))).thenReturn(Optional.empty());
+
+        ActivationProductDto dto = new ActivationProductDto(true);
+
+        assertThatThrownBy(() -> productService.setProductActive(missing, dto))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Product not found");
+
+        verify(productRepository).findBySku(eq(missing));
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: throws IllegalArgumentException when SKU is blank")
+    void setProductActive_blankSku_throwsIllegalArgumentException() {
+        ActivationProductDto dto = new ActivationProductDto(true);
+
+        assertThatThrownBy(() -> productService.setProductActive("   ", dto))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: throws IllegalArgumentException when body or flag is null")
+    void setProductActive_nullBodyOrFlag_throwsIllegalArgumentException() {
+        // null body
+        assertThatThrownBy(() -> productService.setProductActive(DEFAULT_SKU, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        // null flag
+        ActivationProductDto bad = new ActivationProductDto(null);
+        assertThatThrownBy(() -> productService.setProductActive(DEFAULT_SKU, bad))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoMoreInteractions(productRepository);
+    }
     // ---------- Helpers ----------
 
     private Product createDefaultProductEntity() {

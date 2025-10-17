@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.controller;
 
+import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
 import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
@@ -22,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 
@@ -153,6 +155,45 @@ public class ProductControllerTest {
                 .andExpect(jsonPath("$.type").value("urn:problem:malformed-json"))
                 .andExpect(jsonPath("$.title").value("Malformed JSON"));
 
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    void patch_activation_valid_returns200() throws Exception {
+        String sku = "MUG-LOGO-001";
+        String url = "/products/" + sku + "/activation";
+        String payload = "{\"isActive\": true}";
+
+        ProductDto returned = new ProductDto();
+        returned.setSku(sku);
+        returned.setName("Mug");
+        returned.setDescription("d");
+        returned.setPrice(new BigDecimal("10.99"));
+        returned.setCurrency(Currency.EUR);
+        returned.setStockQuantity(100);
+        returned.setIsActive(true);
+
+        when(productService.setProductActive(eq(sku), any(ActivationProductDto.class))).thenReturn(returned);
+
+        mvc.perform(patch(url).contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sku").value(sku))
+                .andExpect(jsonPath("$.isActive").value(true))
+                .andExpect(handler().methodName("setActivation"));
+
+        verify(productService).setProductActive(eq(sku), any(ActivationProductDto.class));
+        verifyNoMoreInteractions(productService);
+    }
+
+    @Test
+    void patch_activation_invalidPayload_returns400_problem() throws Exception {
+        String sku = "MUG-LOGO-001";
+        String url = "/products/" + sku + "/activation";
+        // missing isActive
+        mvc.perform(patch(url).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:validation"));
         verifyNoInteractions(productService);
     }
 }

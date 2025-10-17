@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.controller;
 
+import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
 import com.waalterGar.projects.ecommerce.service.ProductService;
@@ -8,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,5 +48,12 @@ public class ProductController {
     public ResponseEntity<ProductDto> updateProduct(@PathVariable("sku") String sku,@Valid @RequestBody UpdateProductDto dto){
         ProductDto updatedProductDto = productService.updateProduct(sku, dto);
         return ResponseEntity.ok(updatedProductDto);
+    }
+
+    @PatchMapping(path = "/{sku}/activation",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ProductDto> setActivation(@PathVariable String sku, @Valid @RequestBody ActivationProductDto dto) {
+        return ResponseEntity.ok(productService.setProductActive(sku, dto));
     }
 }

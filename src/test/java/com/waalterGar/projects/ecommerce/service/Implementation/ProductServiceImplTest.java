@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
+import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.entity.Product;
@@ -179,6 +180,72 @@ class ProductServiceImplTest {
         verifyNoMoreInteractions(productRepository);
     }
 
+    @Test
+    @DisplayName("setProductActive: flips flag on managed entity and returns updated DTO")
+    void setProductActive_happyPath_updatesEntityAndReturnsDto() {
+        // Given
+        Product existing = createDefaultProductEntity();
+        existing.setIsActive(false); // initial state
+        when(productRepository.findBySku(eq(DEFAULT_SKU))).thenReturn(Optional.of(existing));
+
+        ActivationProductDto dto = new ActivationProductDto(true);
+
+        // When
+        ProductDto out = productService.setProductActive(DEFAULT_SKU, dto);
+
+        // Then (DTO reflects new state)
+        assertThat(out).isNotNull();
+        assertThat(out.getSku()).isEqualTo(DEFAULT_SKU);
+        assertThat(out.getIsActive()).isTrue();
+
+        // And (entity actually mutated; dirty checking will persist in real tx)
+        assertThat(existing.getIsActive()).isTrue();
+
+        verify(productRepository).findBySku(eq(DEFAULT_SKU));
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: throws NoSuchElementException when SKU does not exist")
+    void setProductActive_notFound_throwsNoSuchElementException() {
+        String missing = "MISSING-SKU";
+        when(productRepository.findBySku(eq(missing))).thenReturn(Optional.empty());
+
+        ActivationProductDto dto = new ActivationProductDto(true);
+
+        assertThatThrownBy(() -> productService.setProductActive(missing, dto))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Product not found");
+
+        verify(productRepository).findBySku(eq(missing));
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: throws IllegalArgumentException when SKU is blank")
+    void setProductActive_blankSku_throwsIllegalArgumentException() {
+        ActivationProductDto dto = new ActivationProductDto(true);
+
+        assertThatThrownBy(() -> productService.setProductActive("   ", dto))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoMoreInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("setProductActive: throws IllegalArgumentException when body or flag is null")
+    void setProductActive_nullBodyOrFlag_throwsIllegalArgumentException() {
+        // null body
+        assertThatThrownBy(() -> productService.setProductActive(DEFAULT_SKU, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        // null flag
+        ActivationProductDto bad = new ActivationProductDto(null);
+        assertThatThrownBy(() -> productService.setProductActive(DEFAULT_SKU, bad))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoMoreInteractions(productRepository);
+    }
     // ---------- Helpers ----------
 
     private Product createDefaultProductEntity() {

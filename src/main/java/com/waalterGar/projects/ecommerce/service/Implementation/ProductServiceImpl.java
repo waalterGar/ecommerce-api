@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
+import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
 import com.waalterGar.projects.ecommerce.entity.Product;
@@ -60,6 +61,24 @@ public class ProductServiceImpl implements ProductService {
         product.setStockQuantity(dto.getStockQuantity());
         product.setIsActive(dto.getIsActive());
 
+        return ProductMapper.toDto(product);
+    }
+
+    @Transactional
+    @Override
+    public ProductDto setProductActive(String sku, ActivationProductDto dto) {
+        if (sku == null || sku.isBlank()) {
+            throw new IllegalArgumentException("Invalid sku");
+        }
+
+        if (dto == null || dto.getIsActive() == null) {
+            throw new IllegalArgumentException("isActive is required");
+        }
+
+        Product product = productRepository.findBySku(sku)
+                .orElseThrow(() -> new NoSuchElementException("Product not found"));
+
+        product.setIsActive(dto.getIsActive());
         return ProductMapper.toDto(product);
     }
 }

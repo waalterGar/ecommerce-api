@@ -9,6 +9,7 @@ import com.waalterGar.projects.ecommerce.entity.Product;
 import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
 import com.waalterGar.projects.ecommerce.repository.OrderRepository;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
+import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException;
 import com.waalterGar.projects.ecommerce.testsupport.builders.CustomerBuilder;
 import com.waalterGar.projects.ecommerce.testsupport.builders.OrderBuilder;
@@ -349,6 +350,37 @@ class OrderServiceImplTest {
         // When / Then
         assertThatThrownBy(() -> orderService.createOrder(order))
                 .isInstanceOf(NoSuchElementException.class);
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void createOrder_inactiveProduct_throws422_andDoesNotSave() {
+        // Arrange: order with a single item for FIRST_PRODUCT_SKU
+        createOrderDto dto = singleItemOrderDto(CUSTOMER_EXT_ID, FIRST_PRODUCT_SKU, 1);
+
+        // existing customer
+        Customer customer = new CustomerBuilder().withExternalId(CUSTOMER_EXT_ID).build();
+        when(customerRepository.findByExternalId(CUSTOMER_EXT_ID)).thenReturn(Optional.of(customer));
+
+        Product inactive = new ProductBuilder()
+                .withSku(FIRST_PRODUCT_SKU)
+                .withName(FIRST_PRODUCT_NAME)
+                .withPrice(FIRST_PRODUCT_PRICE.toPlainString())
+                .withCurrency(PRODUCT_CURRENCY)
+                .withStockQuantity(10)
+                .build();
+        inactive.setIsActive(false);  // INACTIVE
+
+        when(productRepository.findBySku(FIRST_PRODUCT_SKU)).thenReturn(Optional.of(inactive));
+
+        // Act + Assert
+        assertThatThrownBy(() -> orderService.createOrder(dto))
+                .isInstanceOf(InactiveProductException.class)
+                .hasMessageContaining("Product is inactive: " + FIRST_PRODUCT_SKU);
+
+        // And: no persistence attempted
+        verify(customerRepository).findByExternalId(CUSTOMER_EXT_ID);
+        verify(productRepository).findBySku(FIRST_PRODUCT_SKU);
         verify(orderRepository, never()).save(any(Order.class));
     }
 

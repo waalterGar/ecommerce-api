@@ -1,16 +1,11 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
-import com.waalterGar.projects.ecommerce.Dto.OrderDto;
-import com.waalterGar.projects.ecommerce.Dto.ProductDto;
-import com.waalterGar.projects.ecommerce.Dto.createOrderDto;
-import com.waalterGar.projects.ecommerce.Dto.createOrderItemDto;
-import com.waalterGar.projects.ecommerce.entity.Customer;
-import com.waalterGar.projects.ecommerce.entity.Order;
-import com.waalterGar.projects.ecommerce.entity.OrderItem;
-import com.waalterGar.projects.ecommerce.entity.Product;
+import com.waalterGar.projects.ecommerce.Dto.*;
+import com.waalterGar.projects.ecommerce.entity.*;
 import com.waalterGar.projects.ecommerce.mapper.OrderMapper;
 import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
 import com.waalterGar.projects.ecommerce.repository.OrderRepository;
+import com.waalterGar.projects.ecommerce.repository.PaymentRepository;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
 import com.waalterGar.projects.ecommerce.service.OrderService;
 import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
@@ -22,9 +17,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+
+import static java.math.RoundingMode.HALF_UP;
 
 @Transactional
 @RequiredArgsConstructor
@@ -33,6 +31,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
+    private final PaymentRepository paymentRepository;
 
     @Transactional
     @Override
@@ -88,7 +87,7 @@ public class OrderServiceImpl implements OrderService {
             totalAmount = totalAmount.add(item.getLineTotal());
         }
 
-        order.setTotalAmount(totalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
+        order.setTotalAmount(totalAmount.setScale(2, HALF_UP));
         return OrderMapper.toDto(orderRepository.save(order));
     }
 
@@ -96,6 +95,77 @@ public class OrderServiceImpl implements OrderService {
     public OrderDto getOrderByExternalId(String externalId) {
         Order order = orderRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        return OrderMapper.toDto(order);
+    }
+
+    @Transactional
+    @Override
+    public OrderDto pay(String externalId, PayOrderRequestDto dto) {
+        if (externalId == null || externalId.isBlank()) {
+            throw new IllegalArgumentException("Invalid externalId");
+        }
+
+        Order order = orderRepository.findByExternalId(externalId)
+                .orElseThrow(() -> new NoSuchElementException("Order not found"));
+
+        if (order.getStatus() == OrderStatus.PAID) {
+            return OrderMapper.toDto(order);
+        }
+
+        if (order.getStatus() != OrderStatus.CREATED) {
+            throw new IllegalArgumentException("Order not payable from status " + order.getStatus());
+        }
+
+        if (dto != null) {
+            if (dto.getAmount() != null) {
+                BigDecimal expected = order.getTotalAmount().setScale(2, HALF_UP);
+                BigDecimal provided = dto.getAmount().setScale(2, HALF_UP);
+                if (expected.compareTo(provided) != 0) {
+                    System.out.println("expected: "+ expected);
+                    System.out.println("provided: "+ provided);
+                    throw new IllegalArgumentException("Amount mismatch");
+                }
+            }
+
+            if (dto.getCurrency() != null) {
+                Currency provided = dto.getCurrency();
+                if (provided != order.getCurrency()) {
+                    throw new IllegalArgumentException("Currency mismatch");
+                }
+            }
+
+            String txRef = dto != null ? dto.getTransactionReference() : null;
+
+            if (txRef != null) {
+                var existing = paymentRepository
+                        .findByOrder_ExternalIdAndTransactionReference(externalId, txRef);
+                if (existing.isPresent()) {
+                    if (order.getStatus() != OrderStatus.PAID) {
+                        order.setStatus(OrderStatus.PAID);
+                        order.setPaidAt(existing.get().getPaidAt());
+                    }
+                    return OrderMapper.toDto(order);
+                }
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Payment p = new Payment();
+        p.setOrder(order);
+        p.setAmount(order.getTotalAmount().setScale(2, HALF_UP));
+        p.setCurrency(order.getCurrency());
+
+        if (dto != null) {
+            p.setProvider(dto.getProvider());
+            p.setTransactionReference(dto.getTransactionReference());
+        }
+
+        p.setPaidAt(now);
+        paymentRepository.save(p);
+
+        order.setStatus(OrderStatus.PAID);
+        order.setPaidAt(now);
+
         return OrderMapper.toDto(order);
     }
 

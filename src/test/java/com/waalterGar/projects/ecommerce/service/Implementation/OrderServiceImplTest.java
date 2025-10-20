@@ -1,13 +1,16 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
+import com.waalterGar.projects.ecommerce.Dto.PayOrderRequestDto;
 import com.waalterGar.projects.ecommerce.Dto.createOrderDto;
 import com.waalterGar.projects.ecommerce.Dto.createOrderItemDto;
 import com.waalterGar.projects.ecommerce.entity.Customer;
 import com.waalterGar.projects.ecommerce.entity.Order;
+import com.waalterGar.projects.ecommerce.entity.Payment;
 import com.waalterGar.projects.ecommerce.entity.Product;
 import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
 import com.waalterGar.projects.ecommerce.repository.OrderRepository;
+import com.waalterGar.projects.ecommerce.repository.PaymentRepository;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
 import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException;
@@ -42,6 +45,7 @@ class OrderServiceImplTest {
     @Mock OrderRepository orderRepository;
     @Mock CustomerRepository customerRepository;
     @Mock ProductRepository productRepository;
+    @Mock PaymentRepository paymentRepository;
 
     @InjectMocks OrderServiceImpl orderService;
 
@@ -57,6 +61,8 @@ class OrderServiceImplTest {
     private static final Currency OTHER_CURRENCY = USD;
     private static final int FIRST_ITEM_QUANTITY = 2;
     private static final int SECOND_ITEM_QUANTITY = 1;
+    private static final String TRANSACTION_REFERENCE = "tx-123";
+    private static final String PAYMENT_PROVIDER = "stripe";
 
     @Test
     @DisplayName("getOrderByExternalId: returns DTO when order exists")
@@ -382,6 +388,148 @@ class OrderServiceImplTest {
         verify(customerRepository).findByExternalId(CUSTOMER_EXT_ID);
         verify(productRepository).findBySku(FIRST_PRODUCT_SKU);
         verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    @DisplayName("pay: CREATED -> PAID (creates payment, sets paidAt)")
+    void pay_happyPath_marksPaid_andCreatesPayment() {
+        // Order in CREATED with totals & currency
+        Order o = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.CREATED)
+                .withCurrency(PRODUCT_CURRENCY)
+                .build();
+       o.setTotalAmount(FIRST_PRODUCT_PRICE);
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(o));
+        when(paymentRepository.findByOrder_ExternalIdAndTransactionReference(any(), any()))
+                .thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PayOrderRequestDto body = new PayOrderRequestDto();
+        body.setAmount(FIRST_PRODUCT_PRICE);
+        body.setCurrency(PRODUCT_CURRENCY);
+        body.setProvider(PAYMENT_PROVIDER);
+        body.setTransactionReference(TRANSACTION_REFERENCE);
+
+        OrderDto out = orderService.pay(ORDER_EXT_ID, body);
+
+        assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(o.getPaidAt()).isNotNull();
+        assertThat(out.getExternalId()).isEqualTo(ORDER_EXT_ID);
+        assertThat(out.getTotalAmount()).isEqualByComparingTo(new BigDecimal("19.99"));
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verify(paymentRepository).findByOrder_ExternalIdAndTransactionReference(ORDER_EXT_ID, TRANSACTION_REFERENCE);
+        verify(paymentRepository).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("pay: idempotent success when same transactionReference already recorded for this order")
+    void pay_idempotent_sameTxRef_returnsSuccess_noDuplicatePayment() {
+        Order o = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.CREATED)
+                .withCurrency(PRODUCT_CURRENCY)
+                .build();
+        o.setTotalAmount(FIRST_PRODUCT_PRICE);
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(o));
+
+        Payment existing = new Payment();
+        existing.setPaidAt(java.time.LocalDateTime.now());
+        when(paymentRepository.findByOrder_ExternalIdAndTransactionReference(ORDER_EXT_ID, TRANSACTION_REFERENCE))
+                .thenReturn(Optional.of(existing));
+
+        PayOrderRequestDto body = new PayOrderRequestDto();
+        body.setTransactionReference(TRANSACTION_REFERENCE);
+
+        OrderDto out = orderService.pay(ORDER_EXT_ID, body);
+
+        assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(out.getExternalId()).isEqualTo(ORDER_EXT_ID);
+
+        verify(paymentRepository).findByOrder_ExternalIdAndTransactionReference(ORDER_EXT_ID, TRANSACTION_REFERENCE);
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("pay: invalid transition from CANCELED -> 400")
+    void pay_fromCanceled_throwsInvalidRequest() {
+        Order o = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.CANCELED)
+                .withCurrency(PRODUCT_CURRENCY)
+                .build();
+        o.setTotalAmount(FIRST_PRODUCT_PRICE);
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(o));
+
+        assertThatThrownBy(() -> orderService.pay(ORDER_EXT_ID, new PayOrderRequestDto()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("payable");
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoMoreInteractions(paymentRepository);
+    }
+
+    @Test
+    @DisplayName("pay: amount mismatch -> 400")
+    void pay_amountMismatch_throws() {
+        Order o = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.CREATED)
+                .withCurrency(PRODUCT_CURRENCY)
+                .build();
+        o.setTotalAmount(FIRST_PRODUCT_PRICE);
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(o));
+
+        PayOrderRequestDto body = new PayOrderRequestDto();
+        body.setAmount(new BigDecimal("20.00"));
+
+        assertThatThrownBy(() -> orderService.pay(ORDER_EXT_ID, body))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Amount mismatch");
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoMoreInteractions(paymentRepository);
+    }
+
+    @Test
+    @DisplayName("pay: currency mismatch -> 400")
+    void pay_currencyMismatch_throws() {
+        Order o = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.CREATED)
+                .withCurrency(OTHER_CURRENCY) // USD
+                .build();
+        o.setTotalAmount(FIRST_PRODUCT_PRICE);
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(o));
+
+        PayOrderRequestDto body = new PayOrderRequestDto();
+        body.setCurrency(PRODUCT_CURRENCY); // EUR
+
+        assertThatThrownBy(() -> orderService.pay(ORDER_EXT_ID, body))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Currency mismatch");
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoMoreInteractions(paymentRepository);
+    }
+
+    @Test
+    @DisplayName("pay: order not found -> 404")
+    void pay_orderNotFound_throws() {
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.pay(ORDER_EXT_ID, null))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Order not found");
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoMoreInteractions(paymentRepository);
     }
 
     private createOrderDto singleItemOrderDto(String customerExternalId, String sku, int quantity) {

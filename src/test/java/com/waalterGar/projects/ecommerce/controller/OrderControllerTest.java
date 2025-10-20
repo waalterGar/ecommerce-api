@@ -312,4 +312,88 @@ class OrderControllerTest {
         verify(orderService).createOrder(any());
         verifyNoMoreInteractions(orderService);
     }
+
+    @Test
+    void pay_happy_returns200() throws Exception {
+        String url = "/orders/ord-123/pay";
+        String payload = """
+      { "amount": 39.98, "currency": "EUR", "provider": "stripe", "transactionReference": "tx-1" }
+    """;
+
+        OrderDto returned = new OrderDto();
+        returned.setExternalId("ord-123");
+        // set other fields as needed…
+
+        when(orderService.pay(eq("ord-123"), any())).thenReturn(returned);
+
+        mvc.perform(post(url)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.externalId").value("ord-123"))
+                .andExpect(handler().methodName("pay"));
+
+        verify(orderService).pay(eq("ord-123"), any());
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void pay_invalidState_returns400_problem() throws Exception {
+        String url = "/orders/ord-123/pay";
+        when(orderService.pay(eq("ord-123"), any()))
+                .thenThrow(new IllegalArgumentException("Order not payable from status CANCELED"));
+
+        mvc.perform(post(url)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"))
+                .andExpect(jsonPath("$.detail").value("Order not payable from status CANCELED"));
+
+        verify(orderService).pay(eq("ord-123"), any());
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void pay_amountMismatch_returns400_problem() throws Exception {
+        String url = "/orders/ord-123/pay";
+        when(orderService.pay(eq("ord-123"), any()))
+                .thenThrow(new IllegalArgumentException("Amount mismatch"));
+
+        mvc.perform(post(url)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                        { "amount": 39.98 }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"))
+                .andExpect(jsonPath("$.detail").value("Amount mismatch"));
+
+        verify(orderService).pay(eq("ord-123"), any());
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void pay_notFound_returns404_problem() throws Exception {
+        String url = "/orders/ord-404/pay";
+        when(orderService.pay(eq("ord-404"), any()))
+                .thenThrow(new NoSuchElementException("Order not found"));
+
+        mvc.perform(post(url)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:not-found"))
+                .andExpect(jsonPath("$.title").value("Resource Not Found"))
+                .andExpect(jsonPath("$.detail").value("Order not found"));
+
+        verify(orderService).pay(eq("ord-404"), any());
+        verifyNoMoreInteractions(orderService);
+    }
 }

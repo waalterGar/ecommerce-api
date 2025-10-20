@@ -168,4 +168,71 @@ public class OrderServiceIT {
 
         return dto;
     }
+
+    @Test
+    void cancel_happyPath_restoresStock_andSetsCanceled() {
+        Customer c = new CustomerBuilder().withExternalId(CUSTOMER_EXT_ID).build();
+        customerRepository.save(c);
+
+        Product p = new ProductBuilder()
+                .withSku(FIRST_PRODUCT_SKU)
+                .withName(FIRST_PRODUCT_NAME)
+                .withPrice(FIRST_PRODUCT_PRICE.toPlainString())
+                .withCurrency(PRODUCT_CURRENCY)
+                .withStockQuantity(10)
+                .build();
+        productRepository.save(p);
+
+        createOrderDto dto = singleItemOrderDto(CUSTOMER_EXT_ID, FIRST_PRODUCT_SKU, FIRST_ITEM_QUANTITY); // FIRST_ITEM_QUANTITY = 3 (per your class)
+        OrderDto created = orderService.createOrder(dto);
+        String ordId = created.getExternalId();
+
+        Product afterCreate = productRepository.findBySku(FIRST_PRODUCT_SKU).orElseThrow();
+        assertThat(afterCreate.getStockQuantity()).isEqualTo(10 - FIRST_ITEM_QUANTITY);
+
+        OrderDto canceled = orderService.cancelOrder(ordId);
+
+        Order reloaded = orderRepository.findByExternalId(ordId).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(com.waalterGar.projects.ecommerce.utils.OrderStatus.CANCELED);
+        assertThat(reloaded.getCanceledAt()).isNotNull();
+
+        Product afterCancel = productRepository.findBySku(FIRST_PRODUCT_SKU).orElseThrow();
+        assertThat(afterCancel.getStockQuantity()).isEqualTo(10);
+
+
+        assertThat(canceled.getExternalId()).isEqualTo(ordId);
+    }
+
+    @Test
+    void cancel_twice_isIdempotent_noDoubleRestock() {
+        Customer c = new CustomerBuilder().withExternalId(CUSTOMER_EXT_ID).build();
+        customerRepository.save(c);
+
+        Product p = new ProductBuilder()
+                .withSku(FIRST_PRODUCT_SKU)
+                .withName(FIRST_PRODUCT_NAME)
+                .withPrice(FIRST_PRODUCT_PRICE.toPlainString())
+                .withCurrency(PRODUCT_CURRENCY)
+                .withStockQuantity(8)
+                .build();
+        productRepository.save(p);
+
+        createOrderDto dto = singleItemOrderDto(CUSTOMER_EXT_ID, FIRST_PRODUCT_SKU, FIRST_ITEM_QUANTITY); // 3
+        String ordId = orderService.createOrder(dto).getExternalId();
+
+        Product afterCreate = productRepository.findBySku(FIRST_PRODUCT_SKU).orElseThrow();
+        assertThat(afterCreate.getStockQuantity()).isEqualTo(8 - FIRST_ITEM_QUANTITY); // 5
+
+        orderService.cancelOrder(ordId);
+
+        // stock must remain 8
+        orderService.cancelOrder(ordId);
+
+        Product afterSecondCancel = productRepository.findBySku(FIRST_PRODUCT_SKU).orElseThrow();
+        assertThat(afterSecondCancel.getStockQuantity()).isEqualTo(8);
+
+        Order reloaded = orderRepository.findByExternalId(ordId).orElseThrow();
+        assertThat(reloaded.getStatus()).isEqualTo(com.waalterGar.projects.ecommerce.utils.OrderStatus.CANCELED);
+    }
+
 }

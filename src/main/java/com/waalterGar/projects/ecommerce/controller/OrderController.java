@@ -43,6 +43,15 @@ public class OrderController {
         return ResponseEntity.ok(orderService.pay(externalId, body));
     }
 
+    @Operation(summary = "Cancel order")
+    @PostMapping(
+            path = "/{externalId}/cancel",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<OrderDto> cancel(@PathVariable String externalId) {
+        return ResponseEntity.ok(orderService.cancelOrder(externalId));
+    }
+
     @Operation(summary = "Get order by externalId")
     @GetMapping("/{orderNumber}")
     public ResponseEntity<OrderDto> getOrderByOrderNumber(@PathVariable String orderNumber){

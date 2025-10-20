@@ -532,6 +532,103 @@ class OrderServiceImplTest {
         verifyNoMoreInteractions(paymentRepository);
     }
 
+    @Test
+    @DisplayName("cancel: CREATED → CANCELED and restocks products")
+    void cancel_happyPath_restocks_andCancels() {
+        // Order with two items
+        Customer customer = new CustomerBuilder().withExternalId(CUSTOMER_EXT_ID).build();
+        Order order = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withCustomer(customer)
+                .withStatus(OrderStatus.CREATED)
+                .addItem(new OrderItemBuilder()
+                        .withSku(FIRST_PRODUCT_SKU)
+                        .withName(FIRST_PRODUCT_NAME)
+                        .withQuantity(2)
+                        .withUnitPrice(FIRST_PRODUCT_PRICE)
+                        .withCurrency(PRODUCT_CURRENCY)
+                        .build())
+                .addItem(new OrderItemBuilder()
+                        .withSku(SECOND_PRODUCT_SKU)
+                        .withName(SECOND_PRODUCT_NAME)
+                        .withQuantity(1)
+                        .withUnitPrice(SECOND_PRODUCT_PRICE)
+                        .withCurrency(PRODUCT_CURRENCY)
+                        .build())
+                .build();
+
+        Product p1 = new ProductBuilder().withSku(FIRST_PRODUCT_SKU).withName(FIRST_PRODUCT_NAME)
+                .withPrice(FIRST_PRODUCT_PRICE.toPlainString()).withCurrency(PRODUCT_CURRENCY)
+                .withStockQuantity(5).build(); // will become 7
+        Product p2 = new ProductBuilder().withSku(SECOND_PRODUCT_SKU).withName(SECOND_PRODUCT_NAME)
+                .withPrice(SECOND_PRODUCT_PRICE.toPlainString()).withCurrency(PRODUCT_CURRENCY)
+                .withStockQuantity(10).build(); // will become 11
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(order));
+        when(productRepository.findBySku(FIRST_PRODUCT_SKU)).thenReturn(Optional.of(p1));
+        when(productRepository.findBySku(SECOND_PRODUCT_SKU)).thenReturn(Optional.of(p2));
+
+        OrderDto out = orderService.cancelOrder(ORDER_EXT_ID);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(order.getCanceledAt()).isNotNull();
+        assertThat(p1.getStockQuantity()).isEqualTo(7);
+        assertThat(p2.getStockQuantity()).isEqualTo(11);
+        assertThat(out.getExternalId()).isEqualTo(ORDER_EXT_ID);
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verify(productRepository).findBySku(FIRST_PRODUCT_SKU);
+        verify(productRepository).findBySku(SECOND_PRODUCT_SKU);
+    }
+
+    @Test
+    @DisplayName("cancel: idempotent when already CANCELED")
+    void cancel_alreadyCanceled_idempotent() {
+        var order = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.CANCELED)
+                .build();
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(order));
+
+        OrderDto out = orderService.cancelOrder(ORDER_EXT_ID);
+
+        assertThat(out.getExternalId()).isEqualTo(ORDER_EXT_ID);
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("cancel: PAID → 400 invalid transition")
+    void cancel_fromPaid_throws() {
+        var order = new OrderBuilder()
+                .withExternalId(ORDER_EXT_ID)
+                .withStatus(OrderStatus.PAID)
+                .build();
+
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(ORDER_EXT_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("Only orders in CREATED status can be canceled");
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    @DisplayName("cancel: order not found → 404")
+    void cancel_orderNotFound() {
+        when(orderRepository.findByExternalId(ORDER_EXT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.cancelOrder(ORDER_EXT_ID))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Order not found");
+
+        verify(orderRepository).findByExternalId(ORDER_EXT_ID);
+        verifyNoInteractions(productRepository);
+    }
+
     private createOrderDto singleItemOrderDto(String customerExternalId, String sku, int quantity) {
         createOrderDto dto = new createOrderDto();
         dto.setCustomerExternalId(customerExternalId);

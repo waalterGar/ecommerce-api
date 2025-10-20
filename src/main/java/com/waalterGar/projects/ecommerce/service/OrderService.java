@@ -12,4 +12,5 @@ public interface OrderService {
     List<OrderDto> getAllOrders();
     OrderDto getOrderByExternalId(String orderNumber);
     OrderDto pay(String externalId, PayOrderRequestDto dto);
+    OrderDto cancelOrder(String externalId);
 }

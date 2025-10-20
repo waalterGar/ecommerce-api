@@ -396,4 +396,54 @@ class OrderControllerTest {
         verify(orderService).pay(eq("ord-404"), any());
         verifyNoMoreInteractions(orderService);
     }
+
+    @Test
+    void cancel_happy_returns200() throws Exception {
+        OrderDto dto = new OrderDto();
+        dto.setExternalId("ord-123");
+        when(orderService.cancelOrder("ord-123")).thenReturn(dto);
+
+        mvc.perform(post("/orders/ord-123/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.externalId").value("ord-123"))
+                .andExpect(handler().handlerType(OrderController.class))
+                .andExpect(handler().methodName("cancel"));
+
+        verify(orderService).cancelOrder("ord-123");
+        verifyNoMoreInteractions(orderService);
+    }
+
+
+    @Test
+    void cancel_invalidState_returns400_problem() throws Exception {
+        when(orderService.cancelOrder("ord-123"))
+                .thenThrow(new IllegalArgumentException("Order not cancelable from status PAID"));
+
+        mvc.perform(post("/orders/ord-123/cancel"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"))
+                .andExpect(jsonPath("$.detail").value("Order not cancelable from status PAID"));
+
+        verify(orderService).cancelOrder("ord-123");
+        verifyNoMoreInteractions(orderService);
+    }
+
+    @Test
+    void cancel_notFound_returns404_problem() throws Exception {
+        when(orderService.cancelOrder("ord-404"))
+                .thenThrow(new NoSuchElementException("Order not found"));
+
+        mvc.perform(post("/orders/ord-404/cancel"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:not-found"))
+                .andExpect(jsonPath("$.title").value("Resource Not Found"))
+                .andExpect(jsonPath("$.detail").value("Order not found"));
+
+        verify(orderService).cancelOrder("ord-404");
+        verifyNoMoreInteractions(orderService);
+    }
 }

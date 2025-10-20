@@ -69,6 +69,9 @@ public class Order {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    @Column(name = "canceled_at")
+    private LocalDateTime canceledAt;
+
     public void addItem(OrderItem item) {
         item.setOrder(this);
         items.add(item);

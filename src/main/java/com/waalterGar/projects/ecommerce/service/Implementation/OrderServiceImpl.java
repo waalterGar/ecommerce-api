@@ -170,6 +170,34 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public OrderDto cancelOrder(String externalId) {
+        if (externalId == null || externalId.isBlank()) {
+            throw new IllegalArgumentException("Invalid externalId");
+        }
+        Order order = orderRepository.findByExternalId(externalId)
+                .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        
+        if (order.getStatus() == OrderStatus.CANCELED) {
+            return OrderMapper.toDto(order);
+        }
+
+        if(order.getStatus() != OrderStatus.CREATED) {
+            throw new IllegalArgumentException("Only orders in CREATED status can be canceled");
+        }
+
+        for(OrderItem item : order.getItems()) {
+            Product product = productRepository.findBySku(item.getProductSku())
+                    .orElseThrow(() -> new NoSuchElementException("Product not found: " + item.getProductSku()));
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+        }
+
+        order.setStatus(OrderStatus.CANCELED);
+        order.setCanceledAt(LocalDateTime.now());
+
+        return OrderMapper.toDto(order);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<OrderDto> getAllOrders() {
         return orderRepository.findAllWithItemsAndCustomer()

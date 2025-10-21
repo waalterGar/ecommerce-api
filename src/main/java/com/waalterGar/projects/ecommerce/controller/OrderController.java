@@ -1,6 +1,7 @@
 package com.waalterGar.projects.ecommerce.controller;
 
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
+import com.waalterGar.projects.ecommerce.Dto.PayOrderRequestDto;
 import com.waalterGar.projects.ecommerce.Dto.createOrderDto;
 import com.waalterGar.projects.ecommerce.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +31,26 @@ public class OrderController {
         return new ResponseEntity<>(createdOrder, HttpStatus.CREATED);
     }
 
+    @Operation(summary = "Pay order")
+    @PostMapping(
+            path = "/{externalId}/pay",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<OrderDto> pay(
+            @PathVariable String externalId,
+            @Valid @RequestBody(required = false) PayOrderRequestDto body) {
+        return ResponseEntity.ok(orderService.pay(externalId, body));
+    }
+
+    @Operation(summary = "Cancel order")
+    @PostMapping(
+            path = "/{externalId}/cancel",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<OrderDto> cancel(@PathVariable String externalId) {
+        return ResponseEntity.ok(orderService.cancelOrder(externalId));
+    }
 
     @Operation(summary = "Get order by externalId")
     @GetMapping("/{orderNumber}")

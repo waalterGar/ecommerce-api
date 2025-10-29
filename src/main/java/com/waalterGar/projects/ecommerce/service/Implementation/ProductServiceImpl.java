@@ -3,11 +3,14 @@ package com.waalterGar.projects.ecommerce.service.Implementation;
 import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
+import com.waalterGar.projects.ecommerce.api.pagination.PageEnvelope;
 import com.waalterGar.projects.ecommerce.entity.Product;
 import com.waalterGar.projects.ecommerce.mapper.ProductMapper;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
 import com.waalterGar.projects.ecommerce.service.ProductService;
 import com.waalterGar.projects.ecommerce.utils.Currency;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,13 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductDto> getAllProducts() {
        List<Product> products = productRepository.findAll();
        return products.stream().map((product) -> ProductMapper.toDto(product)).collect(Collectors.toList());
+    }
+
+    @Override
+    public PageEnvelope<ProductDto> list(Pageable pageable) {
+        Page<Product> page = productRepository.findAll(pageable);
+        Page<ProductDto> dtoPage = page.map(ProductMapper::toDto);
+        return PageEnvelope.of(dtoPage);
     }
 
     @Override

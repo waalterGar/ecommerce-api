@@ -3,11 +3,16 @@ package com.waalterGar.projects.ecommerce.controller;
 import com.waalterGar.projects.ecommerce.Dto.ActivationProductDto;
 import com.waalterGar.projects.ecommerce.Dto.ProductDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateProductDto;
+import com.waalterGar.projects.ecommerce.api.pagination.*;
+import com.waalterGar.projects.ecommerce.api.problem.InvalidPaginationException;
+import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +26,40 @@ import java.util.List;
 @RestController
 public class ProductController {
     private final ProductService productService;
+    private final AllowedSorts productsAllowedSorts;   // Provided by ProductSortConfig
+    private final PaginationProperties props;
 
-    @GetMapping
+
+    @Operation(summary = "List products (paged)")
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PageEnvelope<ProductDto>> listProducts(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(name = "sort", required = false) List<String> sort
+    ) {
+        int effectiveSize = (size == null) ? props.defaultSize() : size;
+        if (effectiveSize < 1 || effectiveSize > props.maxSize()) {
+            throw new InvalidPaginationException("size must be between 1 and " + props.maxSize());
+        }
+
+        List<SortDirective> directives = SortParser.parse(sort);
+        SortValidator.ensureAllowed(directives, productsAllowedSorts);
+
+        Pageable pageable = PageableFactory.from(
+                page,
+                effectiveSize,
+                directives,
+                productsAllowedSorts,
+                props.defaults().products(),  // default sort for products from config
+                props
+        );
+
+        PageEnvelope<ProductDto> body = productService.list(pageable);
+        return ResponseEntity.ok(body);
+    }
+
+
+    @GetMapping("/all")
     public ResponseEntity<List<ProductDto>> getAllProducts() {
         List<ProductDto> products = productService.getAllProducts();
         return ResponseEntity.ok(products);

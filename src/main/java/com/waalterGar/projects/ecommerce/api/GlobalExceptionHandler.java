@@ -1,5 +1,7 @@
 package com.waalterGar.projects.ecommerce.api;
 
+import com.waalterGar.projects.ecommerce.api.problem.InvalidPaginationException;
+import com.waalterGar.projects.ecommerce.api.problem.InvalidSortException;
 import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -142,6 +144,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InactiveProductException.class)
     public ProblemDetail handleInactiveProduct(InactiveProductException ex, HttpServletRequest req) {
         return pd(HttpStatus.UNPROCESSABLE_ENTITY,"Inactive Product", ex.getMessage(), URI.create("urn:problem:inactive-product"), req);
+    }
+
+    @ExceptionHandler(InvalidPaginationException.class)
+    public ProblemDetail handleInvalidPagination(InvalidPaginationException ex, HttpServletRequest req) {
+        return pd(HttpStatus.BAD_REQUEST, "Invalid pagination parameters", ex.getMessage(), URI.create("urn:problem:invalid-pagination"), req);
+    }
+
+    @ExceptionHandler(InvalidSortException.class)
+    public ProblemDetail handleInvalidSort(InvalidSortException ex, HttpServletRequest req) {
+        ProblemDetail problem = pd(
+                HttpStatus.BAD_REQUEST,
+                "Invalid sort parameter",
+                ex.getMessage(),
+                URI.create("urn:problem:invalid-sort"),
+                req
+        );
+        problem.setProperty("invalidField", ex.field());
+        problem.setProperty("allowedFields", ex.allowed());
+        return problem;
     }
 
     /** Build a ProblemDetail and enrich with common properties. */

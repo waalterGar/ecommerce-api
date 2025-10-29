@@ -1,12 +1,12 @@
 package com.waalterGar.projects.ecommerce.api.pagination;
 
+
 import java.util.ArrayList;
 import java.util.List;
 
 public final class SortParser {
     private SortParser() {}
 
-    // Accepts query values like: ["name,asc", "price,desc"]
     public static List<SortDirective> parse(List<String> raw) {
         List<SortDirective> result = new ArrayList<>();
         if (raw == null || raw.isEmpty()) return result;

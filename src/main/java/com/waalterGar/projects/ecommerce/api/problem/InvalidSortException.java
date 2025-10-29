@@ -12,6 +12,12 @@ public class InvalidSortException extends RuntimeException {
         this.allowed = allowed;
     }
 
+    public InvalidSortException(String message) {
+        super(message);
+        this.field = null;
+        this.allowed = null;
+    }
+
     public String field() { return field; }
     public Set<String> allowed() { return allowed; }
 }

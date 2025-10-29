@@ -160,8 +160,8 @@ public class GlobalExceptionHandler {
                 URI.create("urn:problem:invalid-sort"),
                 req
         );
-        problem.setProperty("invalidField", ex.field());
-        problem.setProperty("allowedFields", ex.allowed());
+        if (ex.field() != null) problem.setProperty("invalidField", ex.field());
+        if (ex.allowed() != null) problem.setProperty("allowedFields", ex.allowed());
         return problem;
     }
 

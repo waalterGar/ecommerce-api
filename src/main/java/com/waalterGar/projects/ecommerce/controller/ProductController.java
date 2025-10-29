@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,20 +30,21 @@ public class ProductController {
     private final AllowedSorts productsAllowedSorts;   // Provided by ProductSortConfig
     private final PaginationProperties props;
 
-
     @Operation(summary = "List products (paged)")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<PageEnvelope<ProductDto>> listProducts(
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(required = false) Integer size,
-            @RequestParam(name = "sort", required = false) List<String> sort
+            @RequestParam MultiValueMap<String,String> query
     ) {
         int effectiveSize = (size == null) ? props.defaultSize() : size;
         if (effectiveSize < 1 || effectiveSize > props.maxSize()) {
             throw new InvalidPaginationException("size must be between 1 and " + props.maxSize());
         }
 
-        List<SortDirective> directives = SortParser.parse(sort);
+        List<String> sortRaw = query.get("sort");
+        List<SortDirective> directives = SortParser.parse(sortRaw);
+
         SortValidator.ensureAllowed(directives, productsAllowedSorts);
 
         Pageable pageable = PageableFactory.from(
@@ -50,14 +52,13 @@ public class ProductController {
                 effectiveSize,
                 directives,
                 productsAllowedSorts,
-                props.defaults().products(),  // default sort for products from config
+                props.defaults().products(),
                 props
         );
 
         PageEnvelope<ProductDto> body = productService.list(pageable);
         return ResponseEntity.ok(body);
     }
-
 
     @GetMapping("/all")
     public ResponseEntity<List<ProductDto>> getAllProducts() {

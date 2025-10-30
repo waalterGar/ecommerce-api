@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,13 +26,20 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Orders", description = "Create and retrieve orders")
-@RequiredArgsConstructor
 @RequestMapping("/orders")
 @RestController
 public class OrderController {
     private final OrderService orderService;
     private final AllowedSorts ordersAllowedSorts;   // Provided by OrderSortConfig
     private final PaginationProperties props;
+
+    public OrderController(OrderService service,
+                           @Qualifier("ordersAllowedSorts") AllowedSorts ordersAllowedSorts,
+                           PaginationProperties props) {
+        this.orderService = service;
+        this.ordersAllowedSorts = ordersAllowedSorts;
+        this.props = props;
+    }
 
     @Operation(summary = "Create a new order")
     @PostMapping

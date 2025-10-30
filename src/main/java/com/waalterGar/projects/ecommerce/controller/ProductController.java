@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -22,13 +23,21 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Products", description = "Manage products")
-@RequiredArgsConstructor
+
 @RequestMapping("/products")
 @RestController
 public class ProductController {
     private final ProductService productService;
     private final AllowedSorts productsAllowedSorts;   // Provided by ProductSortConfig
     private final PaginationProperties props;
+
+    public ProductController(ProductService service,
+                             @Qualifier("productsAllowedSorts") AllowedSorts productsAllowedSorts,
+                             PaginationProperties props) {
+        this.productService = service;
+        this.productsAllowedSorts = productsAllowedSorts;
+        this.props = props;
+    }
 
     @Operation(summary = "List products (paged)")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)

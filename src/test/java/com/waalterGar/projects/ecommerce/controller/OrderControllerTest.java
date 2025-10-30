@@ -2,12 +2,16 @@ package com.waalterGar.projects.ecommerce.controller;
 
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
+import com.waalterGar.projects.ecommerce.api.pagination.config.OrderSortConfig;
+import com.waalterGar.projects.ecommerce.api.pagination.config.ProductSortConfig;
+import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.OrderService;
 import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import jakarta.validation.UnexpectedTypeException;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -24,7 +28,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = OrderController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({ GlobalExceptionHandler.class, OrderSortConfig.class })
+@EnableConfigurationProperties(PaginationProperties.class)
 @AutoConfigureMockMvc(addFilters = false)
 class OrderControllerTest {
     private static final String BASE_URL = "/orders";
@@ -95,7 +100,6 @@ class OrderControllerTest {
         verify(orderService).getOrderByExternalId(bad);
         verifyNoMoreInteractions(orderService);
     }
-
 
     @Test
     void createOrder_invalidPayload_returns400_problem() throws Exception {

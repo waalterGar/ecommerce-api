@@ -1,8 +1,10 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
 import com.waalterGar.projects.ecommerce.Dto.*;
+import com.waalterGar.projects.ecommerce.api.pagination.PageEnvelope;
 import com.waalterGar.projects.ecommerce.entity.*;
 import com.waalterGar.projects.ecommerce.mapper.OrderMapper;
+import com.waalterGar.projects.ecommerce.mapper.ProductMapper;
 import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
 import com.waalterGar.projects.ecommerce.repository.OrderRepository;
 import com.waalterGar.projects.ecommerce.repository.PaymentRepository;
@@ -13,6 +15,8 @@ import com.waalterGar.projects.ecommerce.service.exception.InsufficientStockExce
 import com.waalterGar.projects.ecommerce.utils.Currency;
 import com.waalterGar.projects.ecommerce.utils.OrderStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -195,6 +199,13 @@ public class OrderServiceImpl implements OrderService {
         order.setCanceledAt(LocalDateTime.now());
 
         return OrderMapper.toDto(order);
+    }
+
+    @Override
+    public PageEnvelope<OrderDto> list(Pageable pageable) {
+        Page<Order> page = orderRepository.findAll(pageable);
+        Page<OrderDto> dtoPage = page.map(OrderMapper::toDto);
+        return PageEnvelope.of(dtoPage);
     }
 
     @Override

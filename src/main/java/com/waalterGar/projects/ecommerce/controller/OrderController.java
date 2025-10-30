@@ -3,6 +3,9 @@ package com.waalterGar.projects.ecommerce.controller;
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 import com.waalterGar.projects.ecommerce.Dto.PayOrderRequestDto;
 import com.waalterGar.projects.ecommerce.Dto.createOrderDto;
+import com.waalterGar.projects.ecommerce.api.pagination.*;
+import com.waalterGar.projects.ecommerce.api.problem.InvalidPaginationException;
+import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,18 +13,33 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "Orders", description = "Create and retrieve orders")
-@RequiredArgsConstructor
 @RequestMapping("/orders")
 @RestController
 public class OrderController {
     private final OrderService orderService;
+    private final AllowedSorts ordersAllowedSorts;   // Provided by OrderSortConfig
+    private final PaginationProperties props;
+
+    public OrderController(OrderService service,
+                           @Qualifier("ordersAllowedSorts") AllowedSorts ordersAllowedSorts,
+                           PaginationProperties props) {
+        this.orderService = service;
+        this.ordersAllowedSorts = ordersAllowedSorts;
+        this.props = props;
+    }
 
     @Operation(summary = "Create a new order")
     @PostMapping
@@ -59,9 +77,37 @@ public class OrderController {
         return new ResponseEntity<>(order, HttpStatus.OK);
     }
 
-    @GetMapping
+    @GetMapping("/all")
     public ResponseEntity<java.util.List<OrderDto>> getAllOrders(){
         java.util.List<OrderDto> orders = orderService.getAllOrders();
         return new ResponseEntity<>(orders, HttpStatus.OK);
+    }
+
+    @Operation(summary = "List orders (paged)")
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PageEnvelope<OrderDto>> listOrders(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam MultiValueMap<String, String> query
+    ) {
+        int effectiveSize = (size == null) ? props.defaultSize() : size;
+        if (effectiveSize < 1 || effectiveSize > props.maxSize()) {
+            throw new InvalidPaginationException("size must be between 1 and " + props.maxSize());
+        }
+
+        List<String> sortRaw = query.get("sort"); // preserves "field,dir" tokens as sent
+        List<SortDirective> directives = SortParser.parse(sortRaw);
+        SortValidator.ensureAllowed(directives, ordersAllowedSorts);
+
+        Pageable pageable = PageableFactory.from(
+                page,
+                effectiveSize,
+                directives,
+                ordersAllowedSorts,
+                props.defaults().orders(), // default sort for orders
+                props
+        );
+
+        return ResponseEntity.ok(orderService.list(pageable));
     }
 }

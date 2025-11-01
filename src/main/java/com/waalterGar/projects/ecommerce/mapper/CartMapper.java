@@ -25,6 +25,9 @@ public class CartMapper {
         dto.setItems(cart.getItems().stream()
                 .map(CartMapper::toItemDto)
                 .collect(Collectors.toList()));
+
+        computeTotals(cart, dto);
+
         return dto;
     }
 

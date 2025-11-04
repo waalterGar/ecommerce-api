@@ -1,4 +1,4 @@
-package com.waalterGar.projects.ecommerce.service.Implementation;
+package com.waalterGar.projects.ecommerce.service;
 
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 

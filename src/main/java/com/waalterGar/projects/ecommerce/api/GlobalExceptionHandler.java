@@ -151,6 +151,11 @@ public class GlobalExceptionHandler {
         return pd(HttpStatus.BAD_REQUEST, "Invalid pagination parameters", ex.getMessage(), URI.create("urn:problem:invalid-pagination"), req);
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalState(IllegalStateException ex, HttpServletRequest req) {
+        return pd(HttpStatus.BAD_REQUEST, "Invalid Request", ex.getMessage(), TYPE_INVALID, req);
+    }
+
     @ExceptionHandler(InvalidSortException.class)
     public ProblemDetail handleInvalidSort(InvalidSortException ex, HttpServletRequest req) {
         ProblemDetail problem = pd(

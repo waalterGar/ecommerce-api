@@ -153,7 +153,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex, HttpServletRequest req) {
-        return pd(HttpStatus.BAD_REQUEST, "Invalid state", ex.getMessage(), TYPE_INVALID, req);
+        return pd(HttpStatus.BAD_REQUEST, "Invalid Request", ex.getMessage(), TYPE_INVALID, req);
     }
 
     @ExceptionHandler(InvalidSortException.class)

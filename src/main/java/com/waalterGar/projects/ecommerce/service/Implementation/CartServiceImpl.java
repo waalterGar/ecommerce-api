@@ -9,6 +9,7 @@ import com.waalterGar.projects.ecommerce.repository.CartRepository;
 import com.waalterGar.projects.ecommerce.repository.ProductRepository;
 import com.waalterGar.projects.ecommerce.service.CartService;
 import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
+import com.waalterGar.projects.ecommerce.utils.CartStatus;
 import com.waalterGar.projects.ecommerce.utils.Currency;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,8 @@ public class CartServiceImpl implements CartService {
 
         Cart cart = cartRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Cart not found"));
+
+        if (cart.getStatus() != CartStatus.NEW) throw new IllegalStateException("Cart is not editable");
 
         Product product = productRepository.findBySku(sku)
                 .orElseThrow(() -> new NoSuchElementException("Product not found"));
@@ -103,6 +106,8 @@ public class CartServiceImpl implements CartService {
         Cart cart = cartRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Cart not found"));
 
+        if (cart.getStatus() != CartStatus.NEW) throw new IllegalStateException("Cart is not editable");
+
         CartItem item = cart.getItems().stream()
                 .filter(ci -> sku.equals(ci.getProductSku()))
                 .findFirst().orElseThrow(() -> new NoSuchElementException("Item not found in cart: " + sku));
@@ -137,6 +142,8 @@ public class CartServiceImpl implements CartService {
         Cart cart = cartRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Cart not found"));
 
+        if (cart.getStatus() != CartStatus.NEW) throw new IllegalStateException("Cart is not editable");
+
         cart.getItems().stream()
                 .filter(ci -> sku.equals(ci.getProductSku()))
                 .findFirst()
@@ -150,6 +157,9 @@ public class CartServiceImpl implements CartService {
     public CartDto clearCart(String externalId) {
         Cart cart = cartRepository.findByExternalId(externalId)
                 .orElseThrow(() -> new NoSuchElementException("Cart not found"));
+
+        if (cart.getStatus() != CartStatus.NEW) throw new IllegalStateException("Cart is not editable");
+
         cart.clearItems();
         Cart saved = cartRepository.save(cart);
         return CartMapper.toDto(saved);

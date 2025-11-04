@@ -4,6 +4,7 @@ import com.waalterGar.projects.ecommerce.Dto.CartDto;
 import com.waalterGar.projects.ecommerce.Dto.CartItemDto;
 import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
 import com.waalterGar.projects.ecommerce.service.CartService;
+import com.waalterGar.projects.ecommerce.service.CheckoutService;
 import com.waalterGar.projects.ecommerce.service.exception.InactiveProductException;
 import com.waalterGar.projects.ecommerce.utils.Currency;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,8 @@ public class CartControllerTest {
     MockMvc mvc;
     @MockitoBean
     CartService cartService;
+    @MockitoBean
+    CheckoutService checkoutService;
 
     @Test
     @DisplayName("POST /carts -> 200 with new cart")
@@ -193,6 +196,29 @@ public class CartControllerTest {
     }
 
     @Test
+    @DisplayName("PUT /carts/{id}/items/{sku} after checkout -> 400 invalid-request")
+    void updateQty_afterCheckout_returns400_problem() throws Exception {
+        when(cartService.updateQty(anyString(), anyString(), anyInt()))
+                .thenThrow(new IllegalStateException("Cart is not editable"));
+
+        String body = """
+            { "qty": 2 }
+            """;
+
+        mvc.perform(put(BASE_URL + "/" + CART_ID + "/items/" + SKU)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_PROBLEM_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"));
+
+        verify(cartService).updateQty(eq(CART_ID), eq(SKU), eq(2));
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
     @DisplayName("DELETE /carts/{id}/items/{sku} -> 200 removes item")
     void removeItem_returns200() throws Exception {
         when(cartService.removeItem(eq(CART_ID), eq(SKU)))
@@ -206,6 +232,23 @@ public class CartControllerTest {
                 .andExpect(handler().methodName("removeItem"));
 
         verify(cartService).removeItem(CART_ID, SKU);
+        verifyNoMoreInteractions(cartService);
+    }
+
+    @Test
+    @DisplayName("DELETE /carts/{id}/items/{sku} after checkout -> 400 invalid-request")
+    void removeItem_afterCheckout_returns400_problem() throws Exception {
+        when(cartService.removeItem(anyString(), anyString()))
+                .thenThrow(new IllegalStateException("Cart is not editable"));
+
+        mvc.perform(delete(BASE_URL + "/" + CART_ID + "/items/" + SKU)
+                        .accept(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"));
+
+        verify(cartService).removeItem(eq(CART_ID), eq(SKU));
         verifyNoMoreInteractions(cartService);
     }
 
@@ -254,6 +297,29 @@ public class CartControllerTest {
                 .andExpect(jsonPath("$.title").value("Malformed JSON"));
 
         verifyNoInteractions(cartService);
+    }
+
+    @Test
+    @DisplayName("POST /carts/{id}/items after checkout -> 400 invalid-request")
+    void addItem_afterCheckout_returns400_problem() throws Exception {
+        when(cartService.addItem(anyString(), anyString(), anyInt()))
+                .thenThrow(new IllegalStateException("Cart is not editable"));
+
+        String body = """
+            { "sku": "%s", "qty": 1 }
+            """.formatted(SKU);
+
+        mvc.perform(post(BASE_URL + "/" + CART_ID + "/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_PROBLEM_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
+                .andExpect(jsonPath("$.title").value("Invalid Request"));
+
+        verify(cartService).addItem(eq(CART_ID), eq(SKU), eq(1));
+        verifyNoMoreInteractions(cartService);
     }
 
     private static CartDto emptyCart(String id, Currency currency) {

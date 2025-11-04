@@ -141,7 +141,7 @@ public class CartCheckoutControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("urn:problem:invalid-request"))
-                .andExpect(jsonPath("$.title").value("Invalid state"));
+                .andExpect(jsonPath("$.title").value("Invalid Request"));
 
         verify(checkoutService).checkout(EXTERNAL_ID, CUSTOMER_ID);
         verifyNoMoreInteractions(checkoutService);

@@ -5,6 +5,7 @@ import com.waalterGar.projects.ecommerce.Dto.CartDto;
 import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateCartItemDto;
 import com.waalterGar.projects.ecommerce.service.CartService;
+import com.waalterGar.projects.ecommerce.service.CheckoutService;
 import com.waalterGar.projects.ecommerce.utils.Currency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @AllArgsConstructor
 public class CartController {
     private final CartService cartService;
+    private final CheckoutService checkoutService;
 
     @Operation(summary = "Create a new cart")
     @PostMapping
@@ -53,5 +55,13 @@ public class CartController {
     @DeleteMapping("/{externalId}/items")
     public ResponseEntity<CartDto> clearCart(@PathVariable("externalId") String externalId) {
         return ResponseEntity.ok(cartService.clearCart(externalId));
+    }
+
+    @Operation(summary = "Checkout cart")
+    @PostMapping("/{externalId}/checkout")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResponseEntity<OrderDto> checkout(@PathVariable("externalId") String externalId, @RequestParam("customerId") String customerId) {
+        OrderDto createdOrder = checkoutService.checkout(externalId, customerId);
+        return new ResponseEntity<>(createdOrder, HttpStatus.CREATED);
     }
 }

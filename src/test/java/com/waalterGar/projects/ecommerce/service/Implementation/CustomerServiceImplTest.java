@@ -1,5 +1,6 @@
 package com.waalterGar.projects.ecommerce.service.Implementation;
 
+import com.waalterGar.projects.ecommerce.Dto.CreateCustomerDto;
 import com.waalterGar.projects.ecommerce.Dto.CustomerDto;
 import com.waalterGar.projects.ecommerce.entity.Customer;
 import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
@@ -46,7 +47,7 @@ class CustomerServiceImplTest {
     @DisplayName("createCustomer: should save and return CustomerDto")
     void createCustomer_withValidDto_returnsCustomerDto() {
         // Given
-        CustomerDto input = defaultDto();
+        CreateCustomerDto input = defaultDto();
         Customer saved = defaultEntity();
         saved.setId(UUID.randomUUID());          // simulate DB-generated ID
         saved.setEmail(EMAIL.toLowerCase());
@@ -63,6 +64,27 @@ class CustomerServiceImplTest {
         assertThat(result.getExternalId()).isEqualTo(EXT_ID);
         verify(customerRepository).save(any(Customer.class));
     }
+
+    @Test
+    @DisplayName("createCustomer: null body → IllegalArgumentException")
+    void createCustomer_nullBody_throws() {
+        assertThatThrownBy(() -> customerService.createCustomer(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Body is required");
+    }
+
+    @Test
+    @DisplayName("createCustomer: duplicate email → IllegalArgumentException")
+    void createCustomer_duplicateEmail_rejected() {
+        CreateCustomerDto input = defaultDto();
+        // Service checks uniqueness; prefer existsByEmail for speed if repo exposes it
+        when(customerRepository.existsByEmail(EMAIL.toLowerCase())).thenReturn(true);
+
+        assertThatThrownBy(() -> customerService.createCustomer(input))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Email already in use");
+    }
+
 
     @Test
     @DisplayName("getCustomerByExternalId: should return CustomerDto when found")
@@ -111,6 +133,89 @@ class CustomerServiceImplTest {
         verify(customerRepository).findAll();
     }
 
+    // --------- updateCustomer tests ---------
+    @Test
+    @DisplayName("updateCustomer: updates partial fields (name/phone) and returns DTO")
+    void updateCustomer_partialUpdate_success() {
+        // Existing customer in repo
+        Customer existing = defaultEntity();
+        existing.setId(UUID.randomUUID());
+        when(customerRepository.findByExternalId(EXT_ID)).thenReturn(Optional.of(existing));
+
+        // Update firstName + phone only
+        var upd = new com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto();
+        upd.setFirstName("Johnny");
+        upd.setPhoneNumber("+34 600 111 222");
+
+        CustomerDto out = customerService.updateCustomer(EXT_ID, upd);
+
+        assertThat(out.getFirstName()).isEqualTo("Johnny");
+        assertThat(out.getPhoneNumber()).isEqualTo("+34 600 111 222");
+        // unchanged fields remain
+        assertThat(out.getEmail()).isEqualTo(EMAIL);
+        verify(customerRepository).findByExternalId(EXT_ID);
+    }
+
+    @Test
+    @DisplayName("updateCustomer: changing email to a unique value succeeds")
+    void updateCustomer_changeEmail_unique_ok() {
+        Customer existing = defaultEntity();
+        existing.setId(UUID.randomUUID());
+        when(customerRepository.findByExternalId(EXT_ID)).thenReturn(Optional.of(existing));
+
+        var upd = new com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto();
+        upd.setEmail("new.mail@example.com");
+
+        // Unique: repo.findByEmail returns empty
+        when(customerRepository.findByEmail("new.mail@example.com")).thenReturn(Optional.empty());
+
+        CustomerDto out = customerService.updateCustomer(EXT_ID, upd);
+
+        assertThat(out.getEmail()).isEqualTo("new.mail@example.com");
+        verify(customerRepository).findByExternalId(EXT_ID);
+        verify(customerRepository).findByEmail("new.mail@example.com");
+    }
+
+    @Test
+    @DisplayName("updateCustomer: changing email to one used by another customer → IllegalArgumentException")
+    void updateCustomer_changeEmail_duplicate_rejected() {
+        // Current customer
+        Customer target = defaultEntity();
+        target.setId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+        when(customerRepository.findByExternalId(EXT_ID)).thenReturn(Optional.of(target));
+
+        // Another customer already uses the new email
+        Customer other = defaultEntity();
+        other.setId(UUID.fromString("22222222-2222-2222-2222-222222222222"));
+        other.setEmail("taken@example.com");
+        when(customerRepository.findByEmail("taken@example.com")).thenReturn(Optional.of(other));
+
+        var upd = new com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto();
+        upd.setEmail("taken@example.com");
+
+        assertThatThrownBy(() -> customerService.updateCustomer(EXT_ID, upd))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Email already in use");
+
+        verify(customerRepository).findByExternalId(EXT_ID);
+        verify(customerRepository).findByEmail("taken@example.com");
+    }
+
+    @Test
+    @DisplayName("updateCustomer: non-existent externalId → NoSuchElementException('Customer not found')")
+    void updateCustomer_missingCustomer_throws() {
+        when(customerRepository.findByExternalId(EXT_ID)).thenReturn(Optional.empty());
+
+        var upd = new com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto();
+        upd.setFirstName("X");
+
+        assertThatThrownBy(() -> customerService.updateCustomer(EXT_ID, upd))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Customer not found");
+
+        verify(customerRepository).findByExternalId(EXT_ID);
+    }
+
     // --------- Helper methods ---------
 
     private Customer defaultEntity() {
@@ -131,19 +236,17 @@ class CustomerServiceImplTest {
         return c;
     }
 
-    private CustomerDto defaultDto() {
-        CustomerDto dto = new CustomerDto();
-        dto.setExternalId(EXT_ID);
+    private CreateCustomerDto defaultDto() {
+        CreateCustomerDto dto = new CreateCustomerDto();
         dto.setFirstName(FIRST_NAME);
         dto.setLastName(LAST_NAME);
         dto.setEmail(EMAIL);
-        dto.setPhoneNumber("+34 600123456");
+        dto.setPhone("+34 600123456");
         dto.setAddress("Fake Street 123");
         dto.setCity("Chicago");
         dto.setState("IL");
         dto.setZipCode("60622");
         dto.setCountryCode(COUNTRY);
-        dto.setIsActive(true);
         return dto;
     }
 }

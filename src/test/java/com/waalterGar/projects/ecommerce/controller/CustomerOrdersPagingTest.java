@@ -49,8 +49,8 @@ class CustomerOrdersPagingTest {
     @Test
     @DisplayName("GET /customers/{id}/orders returns PageEnvelope (default paging)")
     void listOrders_defaultPaging() throws Exception {
-        var items = List.of(order("ord-1", new BigDecimal("19.99"), Currency.EUR, OrderStatus.CREATED));
-        var env = new PageEnvelope<>(items, 0, 20, 1L, 1, false, false, List.of("createdAt,desc"));
+        List<OrderDto> items = List.of(order("ord-1", new BigDecimal("19.99"), Currency.EUR, OrderStatus.CREATED));
+        PageEnvelope<OrderDto> env = new PageEnvelope<>(items, 0, 20, 1L, 1, false, false, List.of("createdAt,desc"));
 
         when(orderService.listByCustomer(eq(CUST), any())).thenReturn(env);
 
@@ -66,8 +66,8 @@ class CustomerOrdersPagingTest {
     @Test
     @DisplayName("GET /customers/{id}/orders supports custom page/size and single-sort")
     void listOrders_customPagingAndSort() throws Exception {
-        var items = List.of(order("ord-2", new BigDecimal("35.00"), Currency.EUR, OrderStatus.PAID));
-        var env = new PageEnvelope<>(items, 1, 5, 6L, 2, true, true, List.of("createdAt,desc"));
+        List<OrderDto> items = List.of(order("ord-2", new BigDecimal("35.00"), Currency.EUR, OrderStatus.PAID));
+        PageEnvelope<OrderDto> env = new PageEnvelope<>(items, 1, 5, 6L, 2, true, true, List.of("createdAt,desc"));
 
         when(orderService.listByCustomer(eq(CUST), any())).thenReturn(env);
 
@@ -81,6 +81,24 @@ class CustomerOrdersPagingTest {
                 .andExpect(jsonPath("$.size").value(5))
                 .andExpect(jsonPath("$.sort[0]").value("createdAt,desc"))
                 .andExpect(jsonPath("$.items[0].externalId").value("ord-2"));
+    }
+
+    @Test
+    @DisplayName("GET /customers/{id}/orders returns 200 with empty items when no orders")
+    void listOrders_empty_returnsEmptyEnvelope() throws Exception {
+        PageEnvelope<OrderDto> env = new PageEnvelope<>(
+                List.of(), 0, 20, 0L, 0, true, true, List.of("createdAt,desc")
+        );
+
+        when(orderService.listByCustomer(eq(CUST), any())).thenReturn(env);
+
+        mvc.perform(get(BASE + "/" + CUST + "/orders").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.totalItems").value(0))
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.sort[0]").value("createdAt,desc"));
     }
 
     @Test
@@ -123,7 +141,7 @@ class CustomerOrdersPagingTest {
     }
 
     private static OrderDto order(String extId, BigDecimal total, Currency ccy, OrderStatus st) {
-        var dto = new OrderDto();
+        OrderDto dto = new OrderDto();
         dto.setExternalId(extId);
         dto.setTotalAmount(total);
         dto.setCurrency(ccy);

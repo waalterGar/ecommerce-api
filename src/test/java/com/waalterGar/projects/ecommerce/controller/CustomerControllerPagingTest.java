@@ -8,6 +8,7 @@ import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.CustomerService;
 import com.waalterGar.projects.ecommerce.service.OrderService;
 import com.waalterGar.projects.ecommerce.utils.CountryCode;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,8 +45,8 @@ public class CustomerControllerPagingTest {
     @Test
     @DisplayName("GET /customers returns default PageEnvelope")
     void list_defaultPaging() throws Exception {
-        var items = List.of(customer("cust-1","Jane","Doe","jane@example.com"));
-        var envelope = new PageEnvelope<>(
+        List<CustomerDto> items = List.of(customer("cust-1","Jane","Doe","jane@example.com"));
+        PageEnvelope<CustomerDto> envelope = new PageEnvelope<>(
                 items, 0, 20, 1L, 1, false, false, List.of("createdAt,desc")
         );
         when(customerService.list(isNull(), isNull(), any())).thenReturn(envelope);
@@ -64,8 +65,8 @@ public class CustomerControllerPagingTest {
     @Test
     @DisplayName("GET /customers supports custom page/size and single-sort")
     void list_customPagingAndSingleSort() throws Exception {
-        var items = List.of(customer("cust-2","John","Smith","john@example.com"));
-        var envelope = new PageEnvelope<>(
+        List<CustomerDto> items = List.of(customer("cust-2","John","Smith","john@example.com"));
+        PageEnvelope<CustomerDto> envelope = new PageEnvelope<>(
                 items, 1, 5, 6L, 2, true, true, List.of("lastName,asc")
         );
         when(customerService.list(isNull(), isNull(), any())).thenReturn(envelope);
@@ -85,8 +86,8 @@ public class CustomerControllerPagingTest {
     @Test
     @DisplayName("GET /customers accepts filters (email & q) and returns envelope")
     void list_withFilters_emailAndQ() throws Exception {
-        var items = List.of(customer("cust-3","Alicia","Doe","alicia.doe@example.com"));
-        var envelope = new PageEnvelope<>(
+        List<CustomerDto> items = List.of(customer("cust-3","Alicia","Doe","alicia.doe@example.com"));
+        PageEnvelope<CustomerDto> envelope = new PageEnvelope<>(
                 items, 0, 20, 1L, 1, false, false, List.of("createdAt,desc")
         );
         when(customerService.list(eq("alicia.doe@example.com"), eq("doe"), any())).thenReturn(envelope);
@@ -98,6 +99,41 @@ public class CustomerControllerPagingTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].email").value("alicia.doe@example.com"));
     }
+
+    @Test
+    @DisplayName("GET /customers supports multi-sort (lastName ASC, createdAt DESC)")
+    void list_multiSort() throws Exception {
+        List<CustomerDto> items = List.of(customer("cust-10","Zara","Adams","zara@example.com"));
+        PageEnvelope<CustomerDto> envelope = new PageEnvelope<>(
+                items, 0, 20, 1L, 1, false, false, List.of("lastName,asc","createdAt,desc")
+        );
+        when(customerService.list(isNull(), isNull(), any())).thenReturn(envelope);
+
+        mvc.perform(get(BASE_URL)
+                        .param("sort", "lastName,asc")
+                        .param("sort", "createdAt,desc")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sort[0]").value("lastName,asc"))
+                .andExpect(jsonPath("$.sort[1]").value("createdAt,desc"));
+    }
+
+    @Test
+    @DisplayName("GET /customers applies default sort when none provided")
+    void list_defaultSortApplied_whenMissing() throws Exception {
+        List<CustomerDto> items = List.of(customer("cust-11","Ana","Beta","ana@example.com"));
+        // Controller delegates to service; envelope reflects default sort from props.defaults().customers()
+        PageEnvelope<CustomerDto> envelope = new PageEnvelope<>(
+                items, 0, 20, 1L, 1, false, false, List.of("createdAt,desc")
+        );
+        when(customerService.list(isNull(), isNull(), any())).thenReturn(envelope);
+
+        mvc.perform(get(BASE_URL).accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sort[0]").value("createdAt,desc"));
+    }
+
+
 
     // ---------- Validation / ProblemDetails ----------
 
@@ -124,6 +160,18 @@ public class CustomerControllerPagingTest {
                 .andExpect(jsonPath("$.type").value("urn:problem:invalid-sort"))
                 .andExpect(jsonPath("$.title").value("Invalid sort parameter"))
                 .andExpect(jsonPath("$.allowedFields").isArray());
+    }
+
+    @Test
+    @DisplayName("GET /customers size over max → 400 invalid-pagination")
+    void list_sizeOverMax() throws Exception {
+        mvc.perform(get(BASE_URL)
+                        .param("size", "9999") // above configured max
+                        .accept(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:problem:invalid-pagination"))
+                .andExpect(jsonPath("$.title").value("Invalid pagination parameters"));
     }
 
     // ---------- helpers ----------

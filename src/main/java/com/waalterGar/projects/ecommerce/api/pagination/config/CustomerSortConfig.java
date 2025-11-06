@@ -7,18 +7,10 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Set;
 
 @Configuration
-public class OrderSortConfig {
+public class CustomerSortConfig {
 
     @Bean
-    public AllowedSorts ordersAllowedSorts() {
-        return new AllowedSorts(Set.of(
-                "id",
-                "createdAt",
-                "updatedAt",
-                "status",
-                "totalAmount"
-        ));
+    public AllowedSorts customersAllowedSorts() {
+        return new AllowedSorts(Set.of("createdAt", "lastName", "email"));
     }
-
-
 }

@@ -209,6 +209,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public PageEnvelope<OrderDto> listByCustomer(String customerExternalId, Pageable pageable) {
+        if (customerExternalId == null || customerExternalId.isBlank()) {
+            throw new IllegalArgumentException("Invalid customerExternalId");
+        }
+
+        customerRepository.findByExternalId(customerExternalId)
+                .orElseThrow(() -> new NoSuchElementException("Customer not found"));
+
+        Page<Order> page = orderRepository.findByCustomer_ExternalId(customerExternalId, pageable);
+        return PageEnvelope.of(page.map(OrderMapper::toDto));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<OrderDto> getAllOrders() {
         return orderRepository.findAllWithItemsAndCustomer()

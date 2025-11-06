@@ -4,10 +4,13 @@ import com.waalterGar.projects.ecommerce.Dto.CreateCustomerDto;
 import com.waalterGar.projects.ecommerce.Dto.CustomerDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto;
 import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
+import com.waalterGar.projects.ecommerce.api.pagination.config.CustomerSortConfig;
+import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.CustomerService;
 import com.waalterGar.projects.ecommerce.utils.CountryCode;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -26,7 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = CustomerController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({ GlobalExceptionHandler.class, CustomerSortConfig.class })
+@EnableConfigurationProperties(PaginationProperties.class)
 @AutoConfigureMockMvc(addFilters = false)
 public class CustomerControllerTest {
 
@@ -248,7 +252,7 @@ public class CustomerControllerTest {
     // ---------- GET /customers (list) ----------
 
     @Test
-    @DisplayName("GET /customers → 200 with array of customers")
+    @DisplayName("GET /customers/all → 200 with array of customers")
     void getAllCustomers_returnsList() throws Exception {
         CustomerDto c1 = sampleDto(
                 "cust-001",
@@ -276,7 +280,7 @@ public class CustomerControllerTest {
 
         when(customerService.getAllCustomers()).thenReturn(java.util.List.of(c1, c2));
 
-        mvc.perform(get("/customers").accept(org.springframework.http.MediaType.APPLICATION_JSON))
+        mvc.perform(get("/customers/all").accept(org.springframework.http.MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(org.springframework.http.MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$").isArray())
@@ -288,11 +292,11 @@ public class CustomerControllerTest {
     }
 
     @Test
-    @DisplayName("GET /customers → 200 with empty array when no customers")
+    @DisplayName("GET /customers/all → 200 with empty array when no customers")
     void getAllCustomers_emptyList() throws Exception {
         when(customerService.getAllCustomers()).thenReturn(java.util.List.of());
 
-        mvc.perform(get("/customers").accept(org.springframework.http.MediaType.APPLICATION_JSON))
+        mvc.perform(get("/customers/all").accept(org.springframework.http.MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(org.springframework.http.MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$").isArray())

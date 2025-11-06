@@ -3,13 +3,16 @@ package com.waalterGar.projects.ecommerce.service.Implementation;
 import com.waalterGar.projects.ecommerce.Dto.CreateCustomerDto;
 import com.waalterGar.projects.ecommerce.Dto.CustomerDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto;
+import com.waalterGar.projects.ecommerce.api.pagination.PageEnvelope;
 import com.waalterGar.projects.ecommerce.entity.Customer;
 import com.waalterGar.projects.ecommerce.mapper.CustomerMapper;
 import com.waalterGar.projects.ecommerce.repository.CustomerRepository;
 import com.waalterGar.projects.ecommerce.service.CustomerService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -68,5 +71,20 @@ public class CustomerServiceImpl implements CustomerService {
 
         CustomerMapper.applyUpdate(c, dto);
         return CustomerMapper.toDto(c);
+    }
+
+    @Override
+    public PageEnvelope<CustomerDto> list(String email, String q, Pageable pageable) {
+        Page<Customer> page;
+        if (email != null && !email.isBlank()) {
+            page = customerRepository.findByEmailContainingIgnoreCase(email.trim(), pageable);
+        } else if (q != null && !q.isBlank()) {
+            String like = q.trim();
+            page = customerRepository.findByEmailContainingIgnoreCaseOrLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCase(
+                    like, like, like, pageable);
+        } else {
+            page = customerRepository.findAll(pageable);
+        }
+        return PageEnvelope.of(page.map(CustomerMapper::toDto));
     }
 }

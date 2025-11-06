@@ -25,7 +25,7 @@ public class CustomerController {
     @Operation(summary = "Create customer")
     @PostMapping(
             consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
+            produces = { MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_PROBLEM_JSON_VALUE }
     )
     public ResponseEntity<CustomerDto> createCustomer(
             @Valid @RequestBody CreateCustomerDto body
@@ -38,7 +38,7 @@ public class CustomerController {
     @PatchMapping(
             path = "/{externalId}",
             consumes = MediaType.APPLICATION_JSON_VALUE,
-            produces = MediaType.APPLICATION_JSON_VALUE
+            produces = { MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_PROBLEM_JSON_VALUE }
     )
     public ResponseEntity<CustomerDto> updateCustomer(
             @PathVariable String externalId,

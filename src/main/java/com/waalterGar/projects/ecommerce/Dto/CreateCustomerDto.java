@@ -14,13 +14,16 @@ import lombok.Setter;
 @NoArgsConstructor
 public class CreateCustomerDto {
 
+    @NotBlank
     @Email @Size(max = 254)
     private String email;
 
     @Size(max = 80)
+    @NotBlank
     private String firstName;
 
     @Size(max = 80)
+    @NotBlank
     private String lastName;
 
     @Size(max = 30)

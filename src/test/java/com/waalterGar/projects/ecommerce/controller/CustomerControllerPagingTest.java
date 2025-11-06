@@ -6,6 +6,7 @@ import com.waalterGar.projects.ecommerce.api.pagination.PageEnvelope;
 import com.waalterGar.projects.ecommerce.api.pagination.config.CustomerSortConfig;
 import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.CustomerService;
+import com.waalterGar.projects.ecommerce.service.OrderService;
 import com.waalterGar.projects.ecommerce.utils.CountryCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ public class CustomerControllerPagingTest {
     @Autowired MockMvc mvc;
 
     @MockitoBean CustomerService customerService;
+    @MockitoBean OrderService orderService;
 
     @Test
     @DisplayName("GET /customers returns default PageEnvelope")

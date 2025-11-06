@@ -3,6 +3,7 @@ package com.waalterGar.projects.ecommerce.controller;
 
 import com.waalterGar.projects.ecommerce.Dto.CreateCustomerDto;
 import com.waalterGar.projects.ecommerce.Dto.CustomerDto;
+import com.waalterGar.projects.ecommerce.Dto.OrderDto;
 import com.waalterGar.projects.ecommerce.Dto.UpdateCustomerDto;
 import com.waalterGar.projects.ecommerce.api.pagination.*;
 import com.waalterGar.projects.ecommerce.api.problem.InvalidPaginationException;
@@ -29,13 +30,15 @@ import java.util.List;
 @RestController
 public class CustomerController {
     private final CustomerService customerService;
+    private final OrderService orderService;
     private final AllowedSorts customersAllowedSorts;
     private final PaginationProperties props;
 
-    public CustomerController(CustomerService service,
+    public CustomerController(CustomerService customerService, OrderService orderService,
                            @Qualifier("customersAllowedSorts") AllowedSorts customersAllowedSorts,
                            PaginationProperties props) {
-        this.customerService = service;
+        this.customerService = customerService;
+        this.orderService = orderService;
         this.customersAllowedSorts = customersAllowedSorts;
         this.props = props;
     }
@@ -109,4 +112,36 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.list(email, q, pageable));
     }
 
+    @Operation(summary = "List orders for a customer (paged)")
+    @GetMapping(
+            path = "/{externalId}/orders",
+            produces = { MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_PROBLEM_JSON_VALUE }
+    )
+    public ResponseEntity<PageEnvelope<OrderDto>> listCustomerOrders(
+            @PathVariable String externalId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam MultiValueMap<String, String> query,
+            @Qualifier("ordersAllowedSorts") AllowedSorts ordersAllowedSorts
+    ) {
+        int effectiveSize = (size == null) ? props.defaultSize() : size;
+        if (effectiveSize < 1 || effectiveSize > props.maxSize()) {
+            throw new InvalidPaginationException("size must be between 1 and " + props.maxSize());
+        }
+
+        List<String> sortRaw = query.get("sort");
+        List<SortDirective> directives = SortParser.parse(sortRaw);
+        SortValidator.ensureAllowed(directives, customersAllowedSorts);
+
+        var pageable = PageableFactory.from(
+                page,
+                effectiveSize,
+                directives,
+                ordersAllowedSorts,
+                props.defaults().orders(),
+                props
+        );
+
+        return ResponseEntity.ok(orderService.listByCustomer(externalId, pageable));
+    }
 }

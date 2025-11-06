@@ -7,6 +7,7 @@ import com.waalterGar.projects.ecommerce.api.GlobalExceptionHandler;
 import com.waalterGar.projects.ecommerce.api.pagination.config.CustomerSortConfig;
 import com.waalterGar.projects.ecommerce.config.PaginationProperties;
 import com.waalterGar.projects.ecommerce.service.CustomerService;
+import com.waalterGar.projects.ecommerce.service.OrderService;
 import com.waalterGar.projects.ecommerce.utils.CountryCode;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,9 @@ public class CustomerControllerTest {
 
     @MockitoBean
     CustomerService customerService;
+
+    @MockitoBean
+    OrderService orderService;
 
     private static final String BASE = "/customers";
     private static final String EXT_ID = "b6a3c8d1-1234-4a56-8e90-abcdef012345";

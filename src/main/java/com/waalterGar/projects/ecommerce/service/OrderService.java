@@ -17,4 +17,5 @@ public interface OrderService {
     OrderDto pay(String externalId, PayOrderRequestDto dto);
     OrderDto cancelOrder(String externalId);
     PageEnvelope<OrderDto> list(Pageable pageable);
+    PageEnvelope<OrderDto> listByCustomer(String customerExternalId, Pageable pageable);
 }
